@@ -1,0 +1,56 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ProtectCloudTrail",
+      "Effect": "Deny",
+      "Action": [
+        "cloudtrail:StopLogging",
+        "cloudtrail:DeleteTrail",
+        "cloudtrail:UpdateTrail",
+        "cloudtrail:PutEventSelectors",
+        "cloudtrail:RemoveTags"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ProtectConfig",
+      "Effect": "Deny",
+      "Action": [
+        "config:DeleteConfigurationRecorder",
+        "config:DeleteDeliveryChannel",
+        "config:DeleteRetentionConfiguration",
+        "config:StopConfigurationRecorder",
+        "config:PutConfigurationRecorder",
+        "config:PutDeliveryChannel"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ProtectGuardDuty",
+      "Effect": "Deny",
+      "Action": [
+        "guardduty:DeleteDetector",
+        "guardduty:DeleteMembers",
+        "guardduty:DisassociateFromMasterAccount",
+        "guardduty:DisassociateMembers",
+        "guardduty:UpdateDetector",
+        "guardduty:CreateFilter",
+        "guardduty:UpdateFilter"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ProtectSecurityHubAndAccessAnalyzer",
+      "Effect": "Deny",
+      "Action": [
+        "securityhub:DisableSecurityHub",
+        "securityhub:DisassociateFromMasterAccount",
+        "securityhub:DeleteMembers",
+        "securityhub:BatchDisableStandards",
+        "access-analyzer:DeleteAnalyzer"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
