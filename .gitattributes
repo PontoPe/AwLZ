@@ -1,0 +1,5 @@
+# These repos are authored on Windows but run on Linux. Keep LF everywhere.
+* text=auto eol=lf
+*.png binary
+*.gif binary
+*.jpg binary
