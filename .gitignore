@@ -5,6 +5,9 @@
 *.tfstate.*
 *.tfvars
 !example.tfvars
+# Concrete backend values embed the account ID. example.backend.hcl is the
+# committed template; this exact name is not.
+backend.hcl
 tfplan
 *.tfplan
 crash.log

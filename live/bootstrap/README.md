@@ -19,6 +19,10 @@ The threat model ([docs/threat-model.md](../../docs/threat-model.md), T6) says s
 
 ## Run
 
+**Already done once, on 2026-07-28.** This section is the reproduction procedure, not a pending task.
+
+The first pass runs with a local state file, because the bucket does not exist yet. Comment out `backend.tf` for that pass.
+
 ```bash
 cp example.tfvars terraform.tfvars   # fill in profile + account_id
 aws sso login --profile mgmt
@@ -27,23 +31,37 @@ terraform plan -var-file=terraform.tfvars
 terraform apply -var-file=terraform.tfvars
 ```
 
-Then migrate this stack's own state into the bucket:
+Then migrate this stack's own state into the bucket it just created:
 
 ```bash
-terraform output -raw backend_config > backend.tf   # set key = "bootstrap/terraform.tfstate"
-terraform init -migrate-state
+cp example.backend.hcl backend.hcl   # values from: terraform output -raw backend_config
+terraform init -migrate-state -backend-config=backend.hcl
 ```
 
-Confirm the prompt with `yes`. After migration, delete the local `terraform.tfstate` and `terraform.tfstate.backup`.
+Confirm the prompt with `yes`. After migration, delete the local `terraform.tfstate` and `terraform.tfstate.backup` — they are a plaintext copy of the org's full resource graph sitting outside the encrypted bucket.
+
+Every run after that, and every other stack:
+
+```bash
+terraform init -backend-config=backend.hcl
+```
+
+`backend.tf` declares an empty `backend "s3" {}` on purpose. The bucket name embeds the account ID, so concrete values stay in `backend.hcl`, gitignored next to `terraform.tfvars`.
 
 ## Verify
 
 ```bash
-aws s3api get-bucket-versioning --bucket $(terraform output -raw state_bucket) --profile mgmt
-aws s3api get-public-access-block --bucket $(terraform output -raw state_bucket) --profile mgmt
+aws s3api get-bucket-versioning --bucket awlz-tfstate-<account-id> --profile mgmt
+aws s3api get-public-access-block --bucket awlz-tfstate-<account-id> --profile mgmt
+aws s3api get-bucket-encryption --bucket awlz-tfstate-<account-id> --profile mgmt
+aws kms get-key-rotation-status --key-id <key-id> --profile mgmt --region sa-east-1
 ```
 
-Versioning `Enabled`, all four public access flags `true`.
+Confirmed on 2026-07-28: versioning `Enabled`; all four public access flags `true`; SSE `aws:kms` with the CMK and `BucketKeyEnabled`; key rotation on, 365-day period. Bucket policy carries `DenyInsecureTransport` and `DenyUnencryptedObjectUploads`.
+
+## Known gap
+
+S3 server access logging is **not** enabled — the target bucket belongs to the log-archive account, which `live/org-root` has yet to create. Tracked as T6b in [docs/threat-model.md](../../docs/threat-model.md), suppressed with that reference in `.trivyignore` (AWS-0089) and `main.tf` (CKV_AWS_18). Closed by `modules/logging`.
 
 ## Cost
 
