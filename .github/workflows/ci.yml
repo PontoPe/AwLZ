@@ -128,15 +128,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # live/logging and live/detection are absent on purpose.
+        #
+        # Both configure providers that assume OrganizationAccountAccessRole in
+        # member accounts, which carries AdministratorAccess. Planning them from
+        # CI would mean granting a role that runs on *unreviewed pull requests*
+        # the ability to assume administrator in every account in the
+        # organization. That is T1 with the front door held open, and no amount
+        # of read-only policy on the CI role itself would contain it.
+        #
+        # The fix is a dedicated read-only role per member account, trusting
+        # only the plan role, with the assumed role name a variable. Until that
+        # exists, these two stacks are covered by `validate` and by a local
+        # plan before apply — which is stated here rather than papered over.
         stack:
-          [
-            live/bootstrap,
-            live/org-root,
-            live/guardrails,
-            live/logging,
-            live/detection,
-            live/ci-oidc,
-          ]
+          [live/bootstrap, live/org-root, live/guardrails, live/ci-oidc]
 
     env:
       # Terraform ignores TF_VAR_* for variables a stack does not declare, so
@@ -150,6 +156,10 @@ jobs:
       TF_VAR_state_kms_key_arn: ${{ vars.TF_STATE_KMS_KEY }}
       TF_VAR_account_ids: ${{ vars.TF_ACCOUNT_IDS }}
       TF_VAR_scp_targets: ${{ vars.TF_SCP_TARGETS }}
+      TF_VAR_additional_subject_prefixes: ${{ vars.TF_SUBJECT_PREFIXES }}
+      # A secret rather than a variable: this one carries the member account
+      # root email addresses, and secrets are masked in logs.
+      TF_VAR_member_accounts: ${{ secrets.TF_MEMBER_ACCOUNTS }}
 
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
