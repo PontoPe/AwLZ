@@ -1,108 +1,129 @@
 # AwLZ — AWS Landing Zone
 
-Multi-account AWS landing zone built with Terraform: guardrails by default, zero long-lived credentials, and continuous compliance evidence.
+Multi-account AWS landing zone built with Terraform: guardrails by default, zero long-lived credentials, and compliance evidence that is produced rather than claimed.
 
-> **Status:** scaffolding. See [Roadmap](#roadmap) for what is implemented.
+> **Status:** organization, guardrails and remote state are applied and verified against a live AWS organization. Logging, CI federation and detection are not built yet. The [roadmap](#roadmap) marks exactly what exists.
 
 ---
 
 ## Why
 
-Most "AWS security" portfolios show a hardened single account. Real organizations fail at the boundary: an account nobody governs, a region nobody watches, an access key in a CI runner. This repo builds the boundary itself — Organizations, SCPs, org-wide logging, and detection — as reproducible code with compliance evidence attached.
+Most "AWS security" portfolios harden a single account. Real organizations fail at the boundary — an account nobody governs, a region nobody watches, an access key in a CI runner. This repo builds the boundary itself: Organizations, SCPs, org-wide logging, detection, as reproducible code.
+
+The deliverable is not working infrastructure. It is reproducible infrastructure **plus the evidence that the controls do what the documentation says**. See [`docs/evidence/`](docs/evidence/).
 
 ## Architecture
 
 ```mermaid
 flowchart TB
-    subgraph ORG["AWS Organization"]
-        ROOT["Management Account<br/>Organizations + SCPs"]
+    subgraph ORG["AWS Organization (all features, SCPs enabled)"]
+        MGMT["Management account<br/>Organizations, SCPs, Identity Center<br/>Terraform state"]
         subgraph OU_SEC["OU: Security"]
-            SEC["Security Account<br/>log archive + Security Hub delegated admin"]
+            LOG["awlz-log-archive<br/>org trail destination"]
+            SEC["awlz-security<br/>detection delegated admin"]
         end
         subgraph OU_WL["OU: Workloads"]
-            DEV["dev"]
-            PRD["prod"]
+            DEV["awlz-dev"]
+            LAB["awlz-lab"]
         end
     end
 
-    GHA["GitHub Actions"] -->|OIDC AssumeRole<br/>no access keys| ROOT
-    ROOT -->|SCP: deny region,<br/>deny CloudTrail disable| OU_WL
-    DEV & PRD -->|org trail| TRAIL["CloudTrail (org-wide)"]
-    TRAIL --> S3["S3 log archive<br/>KMS CMK + Object Lock"]
-    DEV & PRD --> GD["GuardDuty"] --> SHUB["Security Hub<br/>CIS 3.0 benchmark"]
-    DEV & PRD --> CFG["AWS Config"] --> SHUB
-    SHUB --> EVID["docs/evidence/<br/>CIS score before vs after"]
+    GHA["GitHub Actions"] -.->|OIDC AssumeRole<br/>not built yet| MGMT
+    MGMT -->|"SCPs: region allow-list,<br/>protect detection,<br/>protect guardrail roles"| OU_WL
+    MGMT --> OU_SEC
+    DEV & LAB -.->|not built yet| TRAIL["CloudTrail org trail"]
+    TRAIL -.-> LOG
+    DEV & LAB -.-> GD["GuardDuty"] -.-> SHUB["Security Hub<br/>CIS benchmark"]
+    SHUB -.-> EVID["docs/evidence/"]
+
+    classDef todo stroke-dasharray: 5 5
+    class GHA,TRAIL,GD,SHUB,EVID todo
 ```
 
-Full diagram and decisions: [docs/architecture.md](docs/architecture.md).
+Dashed = not built yet. Decisions and their consequences: [docs/architecture.md](docs/architecture.md).
 
 ## Threat model
 
-Summary — full version in [docs/threat-model.md](docs/threat-model.md).
+Summary — full version with likelihood, impact and residual risk in [docs/threat-model.md](docs/threat-model.md).
 
-| # | Threat | Control | Where |
-|---|--------|---------|-------|
-| T1 | CI credential theft → account takeover | GitHub OIDC federation, no static keys, role scoped by `sub` claim | `modules/iam-oidc` |
-| T2 | Attacker disables logging to hide activity | SCP denies `cloudtrail:StopLogging`/`DeleteTrail`; S3 Object Lock (compliance mode) | `policies/scp`, `modules/logging` |
-| T3 | Resource sprawl in unmonitored regions | SCP denies all actions outside allowed regions | `policies/scp` |
-| T4 | Log tampering / deletion | Dedicated log-archive account, KMS CMK with restrictive key policy, versioning + Object Lock | `modules/logging` |
-| T5 | Privilege escalation via IAM in member accounts | SCP denies changes to guardrail roles; permission boundaries | `policies/scp`, `modules/iam-oidc` |
-| T6 | Terraform state exfiltration (state holds secrets/ARNs) | S3 remote state with a customer-managed KMS key, TLS-only bucket policy, native S3 locking | `live/bootstrap` |
-| T7 | Malicious/typo'd Terraform merged to main | `tflint` + `trivy config` + `checkov` gates in CI, plan-only on PR, apply on protected branch | `.github/workflows` |
+| # | Threat | Control | Status |
+|---|--------|---------|--------|
+| T1 | CI credential theft → account takeover | GitHub OIDC, no static keys, role scoped by `sub` claim | not built — `modules/iam-oidc` |
+| T2 | Attacker disables logging to hide activity | SCP denies destroying CloudTrail/Config/GuardDuty/Security Hub | **applied**, `live/guardrails` |
+| T3 | Resource sprawl in unmonitored regions | SCP region allow-list | **applied + verified** |
+| T4 | Log tampering or deletion | Dedicated log-archive account, KMS CMK, Object Lock | not built — `modules/logging` |
+| T5 | Privilege escalation via IAM in member accounts | SCP denies IAM writes on guardrail roles | **partial** — permission boundaries still missing |
+| T6 | Terraform state exfiltration | S3 + customer-managed KMS key, TLS-only policy, native S3 locking | **applied** |
+| T6b | State object read or overwritten untraced | Versioning + CloudTrail; S3 access logging | **open** — needs `modules/logging` |
+| T7 | Malicious or typo'd Terraform merged | `tflint` + `trivy config` + `checkov`, plan on PR, gated apply | **partial** — gates run, branch protection not configured |
+| T8 | Guardrails lock out emergency access | Break-glass role, documented and alarmed | **partial** — path exercised, no alarm |
+| T9 | Member account root used outside Identity Center | Root credentials **deleted** from member accounts | **eliminated**, `live/org-root` |
 
 ## Layout
 
 ```
-live/           # root modules per account/stage (bootstrap, org-root, security, workload-dev)
-modules/        # reusable modules (organizations, scp, iam-oidc, logging, detection, config-rules)
-policies/scp/   # service control policies as JSON
-tests/          # policy + module tests
-docs/           # architecture, threat model, cost, evidence
+live/bootstrap/    remote state: S3 + KMS CMK, native locking      applied
+live/org-root/     OUs, member accounts, centralized root access   applied
+live/guardrails/   creates and attaches the SCPs                   applied
+policies/scp/      the SCP documents
+modules/           logging, iam-oidc, detection, config-rules      not built
+docs/              architecture, threat model, cost, evidence
 ```
 
-## Bootstrap
+Every stack under `live/` is a root module with pinned provider versions, a partial S3 backend, and `allowed_account_ids` set so a wrong profile fails instead of applying.
+
+## Running it
+
+Local auth is IAM Identity Center. There are no static access keys anywhere in this repo, by design.
 
 ```bash
-make bootstrap
+aws sso login --profile mgmt
+cd live/<stack>
+cp example.tfvars terraform.tfvars      # account id, profile
+cp example.backend.hcl backend.hcl      # state bucket, KMS key
+terraform init -backend-config=backend.hcl
+terraform plan -var-file=terraform.tfvars -out=tfplan
+terraform apply tfplan
 ```
 
-Creates the remote state bucket + lock table in the security account; everything after uses that backend.
+`live/bootstrap` is the exception — it creates the bucket it later stores its own state in, so its first run uses a local backend and then migrates. Procedure in [live/bootstrap/README.md](live/bootstrap/README.md).
+
+State lives in the **management** account, not the security account. That is a deliberate trade-off, recorded as ADR-004.
 
 ## CI gates
 
-| Gate | Tool | Blocking |
-|------|------|----------|
-| Format + lint | `terraform fmt`, `tflint` | yes |
-| Static security | `trivy config`, `checkov` | yes |
-| Plan | `terraform plan` on PR, artifact attached | yes |
-| Apply | manual approval, `main` only, OIDC role | — |
+| Gate | Tool | Status |
+|------|------|--------|
+| Format + lint | `terraform fmt`, `tflint` | running |
+| Static security | `trivy config`, `checkov` | running |
+| Plan on PR | `terraform plan` | stubbed — waiting on OIDC role |
+| Gated apply | manual approval, `main` only | not configured |
 
-## Cost
-
-Estimated monthly cost of the whole landing zone, per account tier: [docs/cost.md](docs/cost.md). Target: keep the demo org runnable under a hard budget with CloudWatch billing alarms.
+Current gate baseline across applied stacks: **0 findings**, with six documented suppressions in `live/bootstrap` and none anywhere else. Every suppression carries its reason inline and, where the finding is real, a threat-model ID and the stack that closes it.
 
 ## Evidence
 
-CIS AWS Foundations Benchmark score **before vs after**, exported from Security Hub: [docs/evidence/](docs/evidence/).
+[docs/evidence/scp-verification.md](docs/evidence/scp-verification.md) — each SCP probed from inside a member account as an account administrator, since an SCP is the only thing that can deny one. Includes a negative control showing the role policy is scoped rather than blanket, and an incident where a guardrail correctly blocked cleanup of a mistake.
 
-## Demo
+Still to come: CIS benchmark score before vs after, cost actuals from a full billing cycle.
 
-![demo](docs/img/demo.gif)
+## Cost
 
-<!-- GIF: apply → SCP blocks a denied-region API call → Security Hub score jumps -->
+[docs/cost.md](docs/cost.md). Governance-only footprint against a hard USD 20/month budget with alerts at 85% and 100%. Home region `sa-east-1` runs 30–50% above `us-east-1`; deliberate, for data residency.
 
 ## Roadmap
 
-- [x] `live/bootstrap` — remote state bucket, KMS CMK, native S3 locking
-- [ ] `modules/organizations` — OUs, account factory
-- [ ] `policies/scp` — region deny, CloudTrail protect, root user deny
-- [ ] `modules/iam-oidc` — GitHub OIDC provider + scoped roles
-- [ ] `modules/logging` — org trail → S3 (KMS, Object Lock) in security account
-- [ ] `modules/detection` — GuardDuty, Config, Security Hub + CIS
-- [ ] CI: fmt/tflint/trivy/checkov/plan
-- [ ] `docs/cost.md` + CIS before/after evidence
-- [ ] Demo GIF
+- [x] `live/bootstrap` — remote state, KMS CMK, native S3 locking
+- [x] `live/org-root` — OUs, member accounts, centralized root access
+- [x] `policies/scp` + `live/guardrails` — region allow-list, protect detection, protect guardrail roles
+- [x] CI: fmt / tflint / trivy / checkov
+- [ ] `modules/logging` — org trail → S3 with KMS + Object Lock in the log-archive account
+- [ ] `modules/iam-oidc` — GitHub OIDC provider + scoped roles; unblocks plan-on-PR
+- [ ] `modules/detection` — GuardDuty, Config, Security Hub + CIS, delegated to `awlz-security`
+- [ ] Permission boundaries + Config rule for T5
+- [ ] CIS score before/after, cost actuals
+- [ ] Demo recording
 
-## Local tooling
+## Toolchain
 
-Not yet installed on the dev workstation: `terraform`, `tflint`, `trivy`, `checkov`, `aws` CLI. See [docs/toolchain.md](docs/toolchain.md).
+terraform 1.15.8, tflint 0.64.0, trivy 0.72.0, checkov 3.3.8, aws-cli 2.36.9. Provider pinned to `hashicorp/aws` 6.56.0 via committed lock files. Setup notes: [docs/toolchain.md](docs/toolchain.md).
