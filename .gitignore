@@ -1,0 +1,12 @@
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+!example.tfvars
+tfplan
+*.tfplan
+crash.log
+.infracost/
+.env
+*.pem

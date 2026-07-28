@@ -1,0 +1,61 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write        # OIDC — no static AWS keys anywhere in this repo
+  pull-requests: write
+
+jobs:
+  static:
+    name: fmt / lint / security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: tflint
+        uses: terraform-linters/setup-tflint@v4
+      - run: tflint --recursive --format compact
+
+      - name: tfsec
+        uses: aquasecurity/tfsec-action@v1.0.3
+
+      - name: checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          quiet: true
+          soft_fail: false
+
+  plan:
+    name: plan
+    needs: static
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        stack: [live/org-root, live/security, live/workload-dev]
+    steps:
+      - uses: actions/checkout@v4
+
+      # TODO: replace with the OIDC role ARN emitted by modules/iam-oidc
+      # - uses: aws-actions/configure-aws-credentials@v4
+      #   with:
+      #     role-to-assume: arn:aws:iam::<mgmt-account>:role/gha-plan
+      #     aws-region: sa-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+      - name: plan
+        working-directory: ${{ matrix.stack }}
+        run: |
+          echo "TODO: terraform init -backend-config=... && terraform plan"
