@@ -48,6 +48,32 @@ variable "allowed_regions" {
   }
 }
 
+variable "deployment_principal_arns" {
+  description = <<-EOT
+    Principals exempt from the *weakening* half of protect-security-services —
+    the calls that reconfigure detection rather than destroy it.
+
+    Needed because those same calls are how detection gets stood up.
+    `config:PutConfigurationRecorder` creates the recorder and can also neuter
+    an existing one; `guardduty:UpdateDetector` is used by the delegated
+    administrator in awlz-security. Denying them outright means
+    modules/detection can never run in any account the policy covers.
+
+    The destructive half — delete, stop, disable, disassociate — has no
+    exemption and applies to these principals too.
+
+    Wildcards are matched with ArnNotLike, so `*` in the account field covers
+    every member account.
+  EOT
+
+  type = list(string)
+
+  default = [
+    "arn:aws:iam::*:role/OrganizationAccountAccessRole",
+    "arn:aws:iam::*:role/awlz-*",
+  ]
+}
+
 variable "scp_targets" {
   description = <<-EOT
     Policy name -> list of OU or account IDs it attaches to.

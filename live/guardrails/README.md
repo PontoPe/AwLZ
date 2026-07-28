@@ -54,6 +54,16 @@ An SCP caps at **5120 bytes**. A `check` block asserts every rendered policy fit
 
 That same round-trip fails the plan on malformed JSON, which is worth more than it sounds: a template typo otherwise surfaces as an opaque API error.
 
+## Two statements, not one
+
+`protect-security-services` splits into a destructive half and a weakening half.
+
+Destroying detection — delete, stop, disable, disassociate — is denied to everyone with no exemption.
+
+Reconfiguring it is denied except to `var.deployment_principal_arns`, because the same calls that weaken detection are the ones that create it. `config:PutConfigurationRecorder` builds the recorder and can also neuter an existing one; `guardduty:UpdateDetector` is what the delegated administrator in `awlz-security` uses. Denying them outright would mean `modules/detection` can never run in any account this policy covers.
+
+The exemption is only as tight as the role names in it. Anything able to create a role matching `awlz-*` inherits it — which is why `protect-guardrail-roles` denies IAM writes against that same prefix.
+
 ## What is deliberately not here
 
 No blanket root-deny SCP. Centralized root access already deleted member root credentials, and a root deny would also block `RootSessions`, the break-glass path. Reasoning in `policies/scp/README.md`; revisit if centralized root access is ever disabled.

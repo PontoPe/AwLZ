@@ -1,61 +1,72 @@
-# SCP verification — `awlz-lab`
+# SCP verification
 
-Date: 2026-07-28. Stack: `live/guardrails`. Target: the `awlz-lab` account, the only attachment at time of writing.
+Stack: `live/guardrails`. Date: 2026-07-28.
 
-Tests run as `OrganizationAccountAccessRole` assumed from the management account — a principal with `AdministratorAccess`. That is the point: an SCP is the only thing that can deny an account administrator, so a test as anything less privileged would prove nothing.
+Account IDs are redacted as `<mgmt>`, `<dev>`, `<lab>`. The repo keeps them out of git; nothing about the result depends on the digits.
 
-Session credentials came from `sts:AssumeRole` and were never written to disk.
+Tests run as `OrganizationAccountAccessRole`, assumed from the management account — a principal holding `AdministratorAccess`. That is the point: an SCP is the only thing that can deny an account administrator, so a test as anything less privileged would prove nothing. Session credentials came from `sts:AssumeRole` and were never written to disk.
 
-| Policy | ID | Probe | Result |
-|---|---|---|---|
-| `deny-unapproved-regions` | `p-6ogkgy2n` | `ec2:DescribeVpcs` in `sa-east-1` | **allowed** — returned `vpc-0aa9ecb2a3f34d277` |
-| `deny-unapproved-regions` | `p-6ogkgy2n` | `ec2:DescribeVpcs` in `eu-west-1` | **explicit deny** |
-| `protect-security-services` | `p-yxl15m5m` | `cloudtrail:StopLogging` | **explicit deny** |
-| `protect-security-services` | `p-yxl15m5m` | `guardduty:DeleteDetector` | **explicit deny** |
-| `protect-guardrail-roles` | `p-jd382c9k` | `iam:DeleteRole` on `awlz-does-not-exist` | **explicit deny** |
-| `protect-guardrail-roles` | `p-jd382c9k` | `iam:DeleteRole` on `unrelated-does-not-exist` | **`NoSuchEntity`** — not denied |
+## Round 1 — attached to `awlz-lab` only
 
-## Why the probes target things that do not exist
+| Policy | Probe | Result |
+|---|---|---|
+| `deny-unapproved-regions` | `ec2:DescribeVpcs` in `sa-east-1` | **allowed** |
+| `deny-unapproved-regions` | `ec2:DescribeVpcs` in `eu-west-1` | **explicit deny** |
+| `protect-security-services` | `cloudtrail:StopLogging` | **explicit deny** |
+| `protect-security-services` | `guardduty:DeleteDetector` | **explicit deny** |
+| `protect-guardrail-roles` | `iam:DeleteRole` on `awlz-does-not-exist` | **explicit deny** |
+| `protect-guardrail-roles` | `iam:DeleteRole` on `unrelated-does-not-exist` | **`NoSuchEntity`** — not denied |
 
-Each denied probe names a resource that was never created — a trail called `no-such-trail`, an all-zero detector ID, a role that does not exist.
+### Why the probes name things that do not exist
 
-If the SCP were missing or misscoped, these calls would come back `TrailNotFound`, `BadRequest`, or `NoSuchEntity`. They come back as an explicit deny instead, which means authorization was evaluated and refused *before* AWS looked for the resource. That distinguishes a working deny from a call that failed for an unrelated reason — and it means nothing had to be created or destroyed to prove it.
+Every denied probe targets a resource that was never created — a trail called `no-such-trail`, an all-zero detector ID, a missing role.
 
-## The last row is the important one
+If the policy were absent or misscoped, those calls return `TrailNotFound`, `BadRequest`, or `NoSuchEntity`. They return an explicit deny instead, so authorization was evaluated and refused *before* AWS looked for the resource. That separates a working deny from a call that failed for an unrelated reason, and nothing had to be created or destroyed to show it.
 
-`iam:DeleteRole` on an unprotected role name returns `NoSuchEntity`, not a deny. The role protection is scoped to `awlz-*` and `OrganizationAccountAccessRole` as intended, rather than blanket-denying `iam:DeleteRole` across the account.
+### The last row is the one that matters
 
-Without this control, the five rows above are also consistent with an SCP that denies far more than intended — which would look like a pass and behave like an outage.
+`iam:DeleteRole` on an unprotected name returns `NoSuchEntity`, not a deny. The role protection is scoped to `awlz-*` and `OrganizationAccountAccessRole` as intended, rather than blanket-denying `iam:DeleteRole`.
 
-## Raw output
+Without that control, the five rows above are equally consistent with a policy that denies far more than intended — which looks like a pass and behaves like an outage.
 
-```
-$ aws ec2 describe-vpcs --region eu-west-1
-An error occurred (UnauthorizedOperation) when calling the DescribeVpcs operation:
-You are not authorized to perform this operation. User:
-arn:aws:sts::<lab-account-id>:assumed-role/OrganizationAccountAccessRole/awlz-scp-verify
-is not authorized to perform: ec2:DescribeVpcs with an explicit deny in a service
-control policy: .../service_control_policy/p-6ogkgy2n
+## Round 2 — widened to the Security and Workloads OUs
 
-$ aws cloudtrail stop-logging --name no-such-trail --region sa-east-1
-An error occurred (AccessDeniedException) when calling the StopLogging operation:
-... explicit deny in a service control policy: .../service_control_policy/p-yxl15m5m
+`protect-security-services` was split before widening. Attaching the original version to the Security OU would have broken `modules/detection` before it was written: the delegated administrator lives in `awlz-security`, and `config:PutConfigurationRecorder` is both how a recorder is created and how an existing one is neutered.
 
-$ aws guardduty delete-detector --detector-id 00000000000000000000000000000000 --region sa-east-1
-An error occurred (AccessDeniedException) when calling the DeleteDetector operation:
-... explicit deny in a service control policy: .../service_control_policy/p-yxl15m5m
+The policy now has two statements:
 
-$ aws iam delete-role --role-name awlz-does-not-exist
-An error occurred (AccessDenied) when calling the DeleteRole operation:
-... explicit deny in a service control policy: .../service_control_policy/p-jd382c9k
+- **`DenyDestroyingDetection`** — delete, stop, disable, disassociate. No exemption, applies to everyone.
+- **`DenyWeakeningDetectionExceptDeployers`** — reconfiguration calls, exempting `OrganizationAccountAccessRole` and `awlz-*` roles via `ArnNotLike`.
 
-$ aws iam delete-role --role-name unrelated-does-not-exist
-An error occurred (NoSuchEntity) when calling the DeleteRole operation:
-The role with name unrelated-does-not-exist cannot be found.
-```
+Verified against `awlz-dev`, which had no policy attached during round 1:
+
+| Probe | Expected | Result |
+|---|---|---|
+| `ec2:DescribeVpcs` in `eu-west-1` | deny | **explicit deny** |
+| `cloudtrail:StopLogging` — destructive, no exemption | deny | **explicit deny** |
+| `config:PutConfigurationRecorder` — weakening, exempt principal | **not** denied | **succeeded** |
+
+## Incident: the third probe was a mutating call
+
+`config:PutConfigurationRecorder` is not a read. It succeeded, which proved the exemption works — and created a real configuration recorder named `awlz-probe` in `awlz-dev`, pointing at a nonexistent role.
+
+Deleting it needed `config:DeleteConfigurationRecorder`, which is in the destructive statement with **no exemption**. The guardrail worked exactly as designed and blocked the cleanup.
+
+Recovery, from the management account:
+
+1. `organizations detach-policy` — `protect-security-services` off the Workloads OU
+2. `configservice delete-configuration-recorder` in `awlz-dev`
+3. `organizations attach-policy` — reattach
+4. `terraform plan` — no drift; the out-of-band detach and reattach produced the same attachment ID
+
+Three things this is worth recording:
+
+- **The recovery path is real and was exercised.** Detaching an SCP requires the management account, which is exempt from SCPs. That exemption is the only reason a bad policy is survivable, and it now has a worked example rather than an assertion.
+- **The probe was badly chosen.** Testing an *allow* by making a mutating call leaves state behind. `describe-configuration-recorders` would have proved nothing about write authorization, so the honest alternative is a mutating call in a throwaway account — `awlz-lab`, not `awlz-dev`.
+- **A guardrail that blocks cleanup is working, not broken.** The recorder was created with `recordingScope: PAID` but never started (`recording: false`), so it cost nothing. Had it been recording, the SCP would have stood between the org and an unwanted bill until someone detached it.
 
 ## Not yet covered
 
-- Policies are attached to `awlz-lab` only. `awlz-dev`, and the Security OU accounts, are unguarded until `scp_targets` widens.
 - `protect-security-services` currently defends nothing real — the org trail does not exist until `modules/logging`. It is in place first so the trail is never briefly unprotected.
-- No probe for the Identity Center role gap noted in `policies/scp/README.md`, because that protection is deliberately absent.
+- No probe for the Identity Center role gap in `policies/scp/README.md`; that protection is deliberately absent.
+- The exemption is only as narrow as the role names. Anything that can create a role matching `awlz-*` inherits it — which is why `protect-guardrail-roles` denies IAM writes on that same prefix.

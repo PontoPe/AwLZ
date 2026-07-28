@@ -6,7 +6,9 @@ locals {
       allowed_regions = jsonencode(var.allowed_regions)
     })
 
-    protect-security-services = file("${path.module}/../../policies/scp/protect-security-services.json")
+    protect-security-services = templatefile("${path.module}/../../policies/scp/protect-security-services.json", {
+      deployment_principal_arns = jsonencode(var.deployment_principal_arns)
+    })
 
     protect-guardrail-roles = templatefile("${path.module}/../../policies/scp/protect-guardrail-roles.json", {
       project = var.project
