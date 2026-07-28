@@ -16,13 +16,14 @@ Done:
 
 - Repo scaffolded: README with architecture diagram + threat model, `docs/threat-model.md`, `docs/architecture.md` (ADR skeleton), `docs/cost.md`, `docs/toolchain.md`, CI workflow, Makefile.
 - AWS management account created: name `pegradowski-mgmt`, root email `pedro.gradowski+aws-mgmt@gmail.com`.
-- Root MFA in progress — two devices, deliberately **not** in the same vault as the root password.
+- Management account root MFA **done** — two devices, deliberately **not** in the same vault as the root password.
 - Billing: IAM access to billing activated, monthly cost budget USD 20 with alerts at 85%/100% actual and 100% forecasted, to `pedro.gradowski+aws-budgeting@gmail.com`.
 - AWS Organizations created, **all features**, Service control policies **enabled**. Org root id `r-ptjo`.
 - IAM Identity Center enabled in **sa-east-1**. Portal `https://pegradowski.awsapps.com/start`, user `pegradowski-iam_ic`, permission set `AdministratorAccess` with a 1-hour session, assigned to `pegradowski-mgmt`.
 - Local CLI profile **`mgmt`** configured via `aws configure sso` — SSO session `pegradowski`, region `sa-east-1`, no static credentials on disk.
-- **`live/bootstrap` applied, 2026-07-28.** 9 resources. Management account is `<mgmt-account-id>`. State bucket `awlz-tfstate-<mgmt-account-id>`, CMK `<kms-key-id>` (alias `alias/awlz-tfstate`), rotation on. State migrated to `bootstrap/terraform.tfstate`; local state files deleted. Verified controls listed in `live/bootstrap/README.md`.
-- Gate baseline on `live/bootstrap`: tflint 0, trivy 0, checkov 0 failed / 6 skipped. Every skip carries a written reason inline. Do not add a bare suppression to this repo — the justification is part of the deliverable.
+- **`live/bootstrap` applied, 2026-07-28.** 9 resources. State bucket `awlz-tfstate-<mgmt-account-id>` with a CMK (alias `alias/awlz-tfstate`), rotation on. State at `bootstrap/terraform.tfstate`; local state files deleted. Verified controls listed in `live/bootstrap/README.md`.
+- **`live/org-root` applied, 2026-07-28.** 1 imported, 7 added, 1 changed. OUs Security and Workloads; accounts `awlz-log-archive` + `awlz-security` under Security, `awlz-dev` + `awlz-lab` under Workloads, all ACTIVE. Trusted access enabled for 8 principals. **Centralized root access is on** — member accounts have no root credentials.
+- Gate baseline: `live/bootstrap` tflint 0 / trivy 0 / checkov 0 failed, 6 skipped with written reasons. `live/org-root` clean on all three. Do not add a bare suppression to this repo — the justification is part of the deliverable.
 
 The manual console phase is finished. Everything from here is Terraform.
 
@@ -35,20 +36,30 @@ aws sts get-caller-identity --profile mgmt
 
 ARN must contain `AWSReservedSSO_AdministratorAccess`. Sessions expire in 1 hour; re-login is routine, not a bug. Then in any applied stack: `terraform init -backend-config=backend.hcl`.
 
-Immediate next step — `live/org-root`, currently an empty directory:
+**Concrete IDs are not in this file on purpose** — account IDs, the org ID, the state bucket name and the KMS key ID live in gitignored `terraform.tfvars` / `backend.hcl`, and the repo goes public. To get them:
 
-1. OUs: Security, Workloads. Org root id `r-ptjo`.
-2. Member accounts: log-archive, security, dev, lab. Each needs a unique root email — the `+` alias pattern on `pedro.gradowski@gmail.com` holds. Account creation is slow and effectively irreversible: closing an account takes 90 days and the email cannot be reused until then. Plan the addresses before applying.
-3. **Centralized root access** (deferred from bootstrap on purpose) — Organizations → "Enable in IAM". Deletes root credentials from member accounts outright. Do it once the accounts exist, and record it in the threat model as eliminating T5 at the source rather than mitigating it.
-4. Backend: copy `live/bootstrap/example.backend.hcl`, change only `key` to `org-root/terraform.tfstate`. Same bucket, same CMK.
+```
+cd live/org-root && terraform output          # account ids, OU ids, org id
+cd live/bootstrap && terraform output -raw backend_config
+```
+
+Immediate next step — `policies/scp`, currently an empty directory:
+
+1. Region deny — allow-list `sa-east-1` + `us-east-1` only.
+2. CloudTrail protection — deny `cloudtrail:StopLogging`, `DeleteTrail`, `PutEventSelectors` (T2).
+3. Guardrail-role protection — deny IAM writes against `awlz-*` roles (T5).
+4. Attach to OU IDs from `terraform output organizational_unit_ids` in `live/org-root`. Security OU takes the strict policy, Workloads the permissive one.
+5. **SCPs do not apply to the management account.** Anything that must hold there is a separate control, not an SCP.
+6. Test on the `lab` account before attaching anywhere else. A wrong SCP locks you out of the account it is attached to, and only the management account can detach it.
 
 Then, in order:
 
-5. `policies/scp` — region deny, CloudTrail protection, root deny.
-6. `modules/logging` — org trail → S3 in the log-archive account, KMS + Object Lock. Also closes T6b (state bucket access logging).
-7. `modules/iam-oidc` — GitHub OIDC provider + roles scoped to `repo:PontoPe/AwLZ:*`. CI (`.github/workflows/ci.yml`) has the plan job stubbed out waiting on this.
-8. `modules/detection` — GuardDuty, Config, Security Hub + CIS.
-9. Evidence: CIS score before vs after, cost actuals, demo GIF.
+7. `modules/logging` — org trail → S3 in the log-archive account, KMS + Object Lock. Also closes T6b (state bucket access logging).
+8. `modules/iam-oidc` — GitHub OIDC provider + roles scoped to `repo:PontoPe/AwLZ:*`. CI (`.github/workflows/ci.yml`) has the plan job stubbed out waiting on this.
+9. `modules/detection` — GuardDuty, Config, Security Hub + CIS. Delegate admin to `awlz-security`, not the management account.
+10. Evidence: CIS score before vs after, cost actuals, demo GIF.
+
+Before the repo goes public: commit `51ce5c0` put the management account ID in this file, and it is already pushed. Either scrub it from history or accept it as low-sensitivity. Nothing after that commit adds concrete IDs.
 
 ## Decisions already made — do not relitigate
 
@@ -68,7 +79,9 @@ Then, in order:
 | Identity Center home region `sa-east-1` | Cannot be changed without deleting the instance. Locked in. |
 | `AdministratorAccess` permission set capped at a 1-hour session | Default is 12 hours. A security portfolio should not ship a 12-hour admin session. |
 
-Deliberately deferred, tracked as step 3 of `org-root` above: **centralized root access for member accounts**.
+| Centralized root access on, via Terraform | `aws_iam_organizations_features` with `RootCredentialsManagement` + `RootSessions`. Member accounts have no root credentials. Break-glass is `OrganizationAccountAccessRole` assumed from the management account. Threat model T9. |
+| Organization adopted by `import` block, managed not read | Makes trusted access declarative — a new service is one line in `var.service_access_principals`. Consequence: `aws_organizations_organization` is global and singular, so only `live/org-root` may manage it. |
+| Member accounts: `close_on_deletion = false`, `prevent_destroy` everywhere | Closing an account starts a 90-day suspension that burns its root email. A destroy should detach, never close. |
 
 ## Conventions
 

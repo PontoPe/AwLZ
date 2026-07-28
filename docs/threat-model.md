@@ -35,6 +35,7 @@ The AWS Organization and its guardrails: management account, security/log-archiv
 | T6b | Repudiation | State object read or overwritten without a trace | Low | Med | Bucket versioning retains superseded state; management-account CloudTrail records the API call | **Open** — S3 server access logging is not enabled. The log-archive account does not exist until `live/org-root` runs, and self-logging would be circular. Closed by `modules/logging`. Suppressed in `live/bootstrap/.trivyignore` (AWS-0089) and `main.tf` (CKV_AWS_18) with this reference. |
 | T7 | Tampering | Malicious Terraform merged | Med | High | Required review, `trivy config`/`checkov`/`tflint` gates, plan-only on PR, apply gated by environment approval | Reviewer fatigue |
 | T8 | DoS | Guardrails lock out legitimate emergency access | Low | Med | Documented break-glass role + procedure, alarmed on use | Break-glass must be tested, not just documented |
+| T9 | Elevation | Member account root used to act outside Identity Center | Med | High | **Eliminated.** `RootCredentialsManagement` deletes root credentials from every member account; `RootSessions` routes the few root-only operations through the management account, audited in CloudTrail. `live/org-root`. | Management account root is out of scope and remains a standing credential — hardware MFA, two devices, password in a separate vault. |
 
 ## Detection mapping
 
@@ -48,7 +49,8 @@ Anything here that cannot be *prevented* must be *detected* — those go to [Pon
 
 ## Assumptions
 
-- The AWS account root credentials are held by the operator with hardware MFA and never used for automation.
+- The **management** account root is held by the operator with hardware MFA on two devices, password stored apart from them, and is never used for automation. Member accounts have no root credentials at all — see T9.
+- Identity Center is the only interactive path in. If it fails, the recovery path is management account root → `OrganizationAccountAccessRole`. That chain has not been rehearsed; T8's residual risk covers it.
 - GitHub organization has 2FA enforced and branch protection on `main`.
 
 ## Out of scope
