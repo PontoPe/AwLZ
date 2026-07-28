@@ -19,7 +19,7 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.9.8"
+          terraform_version: "1.15.8"   # keep in sync with docs/toolchain.md
 
       - name: terraform fmt
         run: terraform fmt -check -recursive
