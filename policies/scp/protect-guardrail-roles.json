@@ -2,7 +2,7 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "ProtectGuardrailRoles",
+      "Sid": "ProtectBreakGlassRoleAbsolutely",
       "Effect": "Deny",
       "Action": [
         "iam:AttachRolePolicy",
@@ -16,9 +16,31 @@
         "iam:UpdateRole"
       ],
       "Resource": [
-        "arn:aws:iam::*:role/${project}-*",
         "arn:aws:iam::*:role/OrganizationAccountAccessRole"
       ]
+    },
+    {
+      "Sid": "ProtectGuardrailRolesExceptDeployers",
+      "Effect": "Deny",
+      "Action": [
+        "iam:AttachRolePolicy",
+        "iam:DeleteRole",
+        "iam:DeleteRolePermissionsBoundary",
+        "iam:DeleteRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePermissionsBoundary",
+        "iam:PutRolePolicy",
+        "iam:UpdateAssumeRolePolicy",
+        "iam:UpdateRole"
+      ],
+      "Resource": [
+        "arn:aws:iam::*:role/${project}-*"
+      ],
+      "Condition": {
+        "ArnNotLike": {
+          "aws:PrincipalArn": ${deployment_principal_arns}
+        }
+      }
     }
   ]
 }

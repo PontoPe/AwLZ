@@ -18,6 +18,7 @@ variable "region" {
 variable "profile" {
   description = "Local AWS CLI profile backed by IAM Identity Center. Never a static access key."
   type        = string
+  default     = ""
 }
 
 variable "account_id" {

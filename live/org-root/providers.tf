@@ -1,6 +1,6 @@
 provider "aws" {
   region  = var.region
-  profile = var.profile
+  profile = var.profile != "" ? var.profile : null
 
   # Organizations is a management-account API. Running this anywhere else
   # would either fail loudly or, worse, act on a different organization.

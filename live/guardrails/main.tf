@@ -11,7 +11,8 @@ locals {
     })
 
     protect-guardrail-roles = templatefile("${path.module}/../../policies/scp/protect-guardrail-roles.json", {
-      project = var.project
+      project                   = var.project
+      deployment_principal_arns = jsonencode(var.deployment_principal_arns)
     })
   }
 
