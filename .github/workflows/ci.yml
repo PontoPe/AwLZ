@@ -5,32 +5,42 @@ on:
   push:
     branches: [main]
 
+# Least privilege. `id-token: write` comes back with modules/iam-oidc, when
+# there is actually a role to assume — not before.
 permissions:
   contents: read
-  id-token: write        # OIDC — no static AWS keys anywhere in this repo
-  pull-requests: write
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Third-party actions are pinned to a commit SHA, not a tag. A tag is mutable:
+# whoever controls the action repo can repoint it at new code, which is T7 with
+# extra steps. The trailing comment records the human-readable version.
 jobs:
   static:
     name: fmt / lint / security
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
-          terraform_version: "1.15.8"   # keep in sync with docs/toolchain.md
+          terraform_version: "1.15.8" # keep in sync with docs/toolchain.md
+          terraform_wrapper: false
 
       - name: terraform fmt
         run: terraform fmt -check -recursive
 
+      - uses: terraform-linters/setup-tflint@6e1e0642c0289bd619021bf6b34e3c08ed1e005a # v6.3.0
       - name: tflint
-        uses: terraform-linters/setup-tflint@v4
-      - run: tflint --recursive --format compact
+        run: tflint --recursive --format compact
 
-      # tfsec is EOL — folded into Trivy's `config` scanner, same rule engine
+      # tfsec is EOL — folded into Trivy's `config` scanner, same rule engine.
+      # HIGH,CRITICAL only here; the LOW findings are triaged locally with
+      # written justifications in live/*/.trivyignore.
       - name: trivy — IaC misconfiguration scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: config
           scan-ref: .
@@ -38,30 +48,42 @@ jobs:
           exit-code: "1"
 
       - name: checkov
-        uses: bridgecrewio/checkov-action@master
+        uses: bridgecrewio/checkov-action@99bb2caf247dfd9f03cf984373bc6043d4e32ebf # v12.1347.0
         with:
           directory: .
+          framework: terraform
           quiet: true
           soft_fail: false
 
-  plan:
-    name: plan
+  validate:
+    name: validate
     needs: static
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        stack: [live/org-root, live/security, live/workload-dev]
+        stack: [live/bootstrap, live/org-root, live/guardrails]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
-      # TODO: replace with the OIDC role ARN emitted by modules/iam-oidc
-      # - uses: aws-actions/configure-aws-credentials@v4
-      #   with:
-      #     role-to-assume: arn:aws:iam::<mgmt-account>:role/gha-plan
-      #     aws-region: sa-east-1
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: "1.15.8"
+          terraform_wrapper: false
 
-      - uses: hashicorp/setup-terraform@v3
-      - name: plan
+      # -backend=false skips the S3 backend entirely, so this needs no AWS
+      # credentials and still catches type errors, bad references and provider
+      # schema violations. The committed lock file means CI resolves the same
+      # provider build the evidence was produced with.
+      - name: init (no backend)
         working-directory: ${{ matrix.stack }}
-        run: |
-          echo "TODO: terraform init -backend-config=... && terraform plan"
+        run: terraform init -backend=false -input=false
+
+      - name: validate
+        working-directory: ${{ matrix.stack }}
+        run: terraform validate -no-color
+
+# There is deliberately no `plan` job yet. Planning needs AWS credentials,
+# which means the OIDC role from modules/iam-oidc. A job that echoes a TODO
+# and exits 0 is a green check that asserts nothing — worse than a missing
+# one, because it looks like coverage. It comes back when the role exists.

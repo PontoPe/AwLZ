@@ -94,12 +94,17 @@ State lives in the **management** account, not the security account. That is a d
 
 | Gate | Tool | Status |
 |------|------|--------|
-| Format + lint | `terraform fmt`, `tflint` | running |
+| Format + lint | `terraform fmt -check`, `tflint --recursive` | running |
 | Static security | `trivy config`, `checkov` | running |
-| Plan on PR | `terraform plan` | stubbed — waiting on OIDC role |
-| Gated apply | manual approval, `main` only | not configured |
+| Validate | `terraform init -backend=false` + `validate`, per stack | running |
+| Plan on PR | `terraform plan` | **absent** — needs the OIDC role |
+| Gated apply | environment approval, `main` only | **absent** — needs the OIDC role |
 
 Current gate baseline across applied stacks: **0 findings**, with six documented suppressions in `live/bootstrap` and none anywhere else. Every suppression carries its reason inline and, where the finding is real, a threat-model ID and the stack that closes it.
+
+Third-party actions are pinned to commit SHAs rather than tags. A tag is mutable — whoever controls the action repository can repoint it at new code, which is T7 arriving through the back door.
+
+There is no `plan` job yet, deliberately. Planning needs credentials, which means the OIDC role. A job that echoes a TODO and exits zero is a green check asserting nothing, which is worse than a missing one because it reads as coverage.
 
 ## Evidence
 
