@@ -25,14 +25,41 @@ locals {
   # The `sub` claim is the whole security boundary. Anything looser — a
   # wildcard on the repository, or omitting the condition — lets any repository
   # on GitHub assume the role. That is T1, and it is a one-character mistake.
-  plan_subs = [
-    "repo:${var.github_repository}:pull_request",
-    "repo:${var.github_repository}:ref:refs/heads/${var.plan_branch}",
+  #
+  # There are two prefix forms in the wild. The familiar `repo:owner/name`, and
+  # the immutable form `repo:owner@<owner-id>/name@<repo-id>`, which GitHub
+  # issues where immutable subject claims apply. The immutable form is
+  # strictly better — renaming a repository or transferring the owner name
+  # cannot silently move trust to whoever claims the old name — but it does not
+  # match a policy written for the plain form, and the resulting failure is an
+  # opaque "Not authorized to perform sts:AssumeRoleWithWebIdentity".
+  #
+  # Check which one a repository issues with:
+  #   gh api repos/<owner>/<name>/actions/oidc/customization/sub
+  #
+  # Both are exact matches pinned to this repository, so accepting both widens
+  # nothing.
+  subject_prefixes = distinct(concat(
+    ["repo:${var.github_repository}"],
+    var.additional_subject_prefixes,
+  ))
+
+  plan_contexts = [
+    "pull_request",
+    "ref:refs/heads/${var.plan_branch}",
   ]
 
-  apply_subs = [
-    "repo:${var.github_repository}:environment:${var.apply_environment}",
+  apply_contexts = [
+    "environment:${var.apply_environment}",
   ]
+
+  plan_subs = flatten([
+    for p in local.subject_prefixes : [for c in local.plan_contexts : "${p}:${c}"]
+  ])
+
+  apply_subs = flatten([
+    for p in local.subject_prefixes : [for c in local.apply_contexts : "${p}:${c}"]
+  ])
 }
 
 data "aws_iam_policy_document" "trust" {

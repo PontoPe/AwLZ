@@ -47,3 +47,9 @@ variable "state_kms_key_arn" {
   description = "CMK protecting Terraform state."
   type        = string
 }
+
+variable "additional_subject_prefixes" {
+  description = "Extra sub prefixes to trust — the immutable form GitHub issues for this repo. See modules/iam-oidc/variables.tf."
+  type        = list(string)
+  default     = []
+}
