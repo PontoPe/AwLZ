@@ -19,17 +19,20 @@ Done:
 - Root MFA in progress — two devices, deliberately **not** in the same vault as the root password.
 - Billing: IAM access to billing activated, monthly cost budget USD 20 with alerts at 85%/100% actual and 100% forecasted, to `pedro.gradowski+aws-budgeting@gmail.com`.
 - AWS Organizations created, **all features**, Service control policies **enabled**. Org root id `r-ptjo`.
+- IAM Identity Center enabled in **sa-east-1**. Portal `https://pegradowski.awsapps.com/start`, user `pegradowski-iam_ic`, permission set `AdministratorAccess` with a 1-hour session, assigned to `pegradowski-mgmt`.
+- Local CLI profile **`mgmt`** configured via `aws configure sso` — SSO session `pegradowski`, region `sa-east-1`, no static credentials on disk.
 - `live/bootstrap` written and `terraform validate`-clean. **Not applied yet.**
 
-Blocked on (manual, console, user does this):
+The manual console phase is finished. Everything from here is Terraform.
 
-- IAM Identity Center not yet enabled. Must be enabled in **sa-east-1** — the home region cannot be changed later without deleting the instance.
-- Until `aws sso login` works, nothing can be applied.
+Immediate next step — nothing has been applied to AWS yet:
 
-Next after that, in order:
-
-1. Apply `live/bootstrap`, migrate its state into the bucket it creates.
-2. `live/org-root` — OUs (Security, Workloads), member accounts (log-archive, security, dev, lab).
+1. Verify auth: `aws sso login --profile mgmt` then `aws sts get-caller-identity --profile mgmt`. The ARN should contain `AWSReservedSSO_AdministratorAccess`. SSO sessions expire in 1 hour; re-login is routine, not a bug.
+2. `cd live/bootstrap`, `cp example.tfvars terraform.tfvars`, fill in `account_id` (12 digits, from `get-caller-identity`). `profile` is `mgmt`, `region` is `sa-east-1`.
+3. `terraform init`, then `terraform plan -var-file=terraform.tfvars`. Expect ~10 resources: KMS key + alias, S3 bucket, versioning, encryption, public access block, ownership controls, lifecycle, bucket policy.
+4. `terraform apply -var-file=terraform.tfvars`.
+5. Migrate state into the bucket it just created — procedure in `live/bootstrap/README.md`. Set `key = "bootstrap/terraform.tfstate"`. Delete the local state files afterwards.
+6. Then `live/org-root` — OUs (Security, Workloads), member accounts (log-archive, security, dev, lab).
 3. `policies/scp` — region deny, CloudTrail protection, root deny.
 4. `modules/logging` — org trail → S3 in the log-archive account, KMS + Object Lock.
 5. `modules/iam-oidc` — GitHub OIDC provider + roles scoped to `repo:PontoPe/AwLZ:*`.
@@ -48,6 +51,10 @@ Next after that, in order:
 | `trivy config` instead of `tfsec` | tfsec is end-of-life; Aqua folded it into Trivy. |
 | Management account hosts no workloads | Governance only. |
 | Alternate contact (Security) set to `+aws-security@` | AWS abuse and compromise notices route there. |
+| Identity Center home region `sa-east-1` | Cannot be changed without deleting the instance. Locked in. |
+| `AdministratorAccess` permission set capped at a 1-hour session | Default is 12 hours. A security portfolio should not ship a 12-hour admin session. |
+
+Not yet done, deliberately deferred: **centralized root access for member accounts** (Organizations banner → "Enable in IAM"). It deletes root credentials from member accounts entirely. Only makes sense once member accounts exist — do it during or after `org-root`, and record it in the threat model as eliminating T5 at the source rather than mitigating it.
 
 ## Conventions
 
