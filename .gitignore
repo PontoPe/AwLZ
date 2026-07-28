@@ -1,5 +1,6 @@
 .terraform/
-.terraform.lock.hcl
+# .terraform.lock.hcl IS committed on purpose — it pins provider versions and
+# hashes, so a clone reproduces the same plan. Reproducibility is the point.
 *.tfstate
 *.tfstate.*
 *.tfvars
