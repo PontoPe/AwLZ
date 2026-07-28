@@ -21,23 +21,34 @@ Done:
 - AWS Organizations created, **all features**, Service control policies **enabled**. Org root id `r-ptjo`.
 - IAM Identity Center enabled in **sa-east-1**. Portal `https://pegradowski.awsapps.com/start`, user `pegradowski-iam_ic`, permission set `AdministratorAccess` with a 1-hour session, assigned to `pegradowski-mgmt`.
 - Local CLI profile **`mgmt`** configured via `aws configure sso` — SSO session `pegradowski`, region `sa-east-1`, no static credentials on disk.
-- `live/bootstrap` written and `terraform validate`-clean. **Not applied yet.**
+- **`live/bootstrap` applied, 2026-07-28.** 9 resources. Management account is `<mgmt-account-id>`. State bucket `awlz-tfstate-<mgmt-account-id>`, CMK `<kms-key-id>` (alias `alias/awlz-tfstate`), rotation on. State migrated to `bootstrap/terraform.tfstate`; local state files deleted. Verified controls listed in `live/bootstrap/README.md`.
+- Gate baseline on `live/bootstrap`: tflint 0, trivy 0, checkov 0 failed / 6 skipped. Every skip carries a written reason inline. Do not add a bare suppression to this repo — the justification is part of the deliverable.
 
 The manual console phase is finished. Everything from here is Terraform.
 
-Immediate next step — nothing has been applied to AWS yet:
+Session start, every time:
 
-1. Verify auth: `aws sso login --profile mgmt` then `aws sts get-caller-identity --profile mgmt`. The ARN should contain `AWSReservedSSO_AdministratorAccess`. SSO sessions expire in 1 hour; re-login is routine, not a bug.
-2. `cd live/bootstrap`, `cp example.tfvars terraform.tfvars`, fill in `account_id` (12 digits, from `get-caller-identity`). `profile` is `mgmt`, `region` is `sa-east-1`.
-3. `terraform init`, then `terraform plan -var-file=terraform.tfvars`. Expect ~10 resources: KMS key + alias, S3 bucket, versioning, encryption, public access block, ownership controls, lifecycle, bucket policy.
-4. `terraform apply -var-file=terraform.tfvars`.
-5. Migrate state into the bucket it just created — procedure in `live/bootstrap/README.md`. Set `key = "bootstrap/terraform.tfstate"`. Delete the local state files afterwards.
-6. Then `live/org-root` — OUs (Security, Workloads), member accounts (log-archive, security, dev, lab).
-3. `policies/scp` — region deny, CloudTrail protection, root deny.
-4. `modules/logging` — org trail → S3 in the log-archive account, KMS + Object Lock.
-5. `modules/iam-oidc` — GitHub OIDC provider + roles scoped to `repo:PontoPe/AwLZ:*`.
-6. `modules/detection` — GuardDuty, Config, Security Hub + CIS.
-7. Evidence: CIS score before vs after, cost actuals, demo GIF.
+```
+aws sso login --profile mgmt
+aws sts get-caller-identity --profile mgmt
+```
+
+ARN must contain `AWSReservedSSO_AdministratorAccess`. Sessions expire in 1 hour; re-login is routine, not a bug. Then in any applied stack: `terraform init -backend-config=backend.hcl`.
+
+Immediate next step — `live/org-root`, currently an empty directory:
+
+1. OUs: Security, Workloads. Org root id `r-ptjo`.
+2. Member accounts: log-archive, security, dev, lab. Each needs a unique root email — the `+` alias pattern on `pedro.gradowski@gmail.com` holds. Account creation is slow and effectively irreversible: closing an account takes 90 days and the email cannot be reused until then. Plan the addresses before applying.
+3. **Centralized root access** (deferred from bootstrap on purpose) — Organizations → "Enable in IAM". Deletes root credentials from member accounts outright. Do it once the accounts exist, and record it in the threat model as eliminating T5 at the source rather than mitigating it.
+4. Backend: copy `live/bootstrap/example.backend.hcl`, change only `key` to `org-root/terraform.tfstate`. Same bucket, same CMK.
+
+Then, in order:
+
+5. `policies/scp` — region deny, CloudTrail protection, root deny.
+6. `modules/logging` — org trail → S3 in the log-archive account, KMS + Object Lock. Also closes T6b (state bucket access logging).
+7. `modules/iam-oidc` — GitHub OIDC provider + roles scoped to `repo:PontoPe/AwLZ:*`. CI (`.github/workflows/ci.yml`) has the plan job stubbed out waiting on this.
+8. `modules/detection` — GuardDuty, Config, Security Hub + CIS.
+9. Evidence: CIS score before vs after, cost actuals, demo GIF.
 
 ## Decisions already made — do not relitigate
 
@@ -48,20 +59,24 @@ Immediate next step — nothing has been applied to AWS yet:
 | No static AWS access keys, anywhere | Local auth via IAM Identity Center SSO; CI via GitHub OIDC. This is a stated selling point of the repo — never introduce an access key, not even temporarily. |
 | Terraform state in the **management** account | The security account does not exist until `org-root` runs. Cross-account state migration was judged riskier than the residual exposure. Accepted, documented in `live/bootstrap/README.md` and threat model T6. |
 | Native S3 state locking (`use_lockfile`), no DynamoDB table | Terraform 1.10+ feature. Fewer resources, no extra cost. |
+| Partial backend config — `backend "s3" {}` plus gitignored `backend.hcl` | The bucket name embeds the account ID, and the repo already keeps account IDs out of git. `example.backend.hcl` is the committed template. |
+| `.terraform.lock.hcl` **is** committed | Was gitignored by mistake. Without it a clone resolves providers fresh and can plan against a different provider version than the evidence was produced with. |
+| No cross-region replication on the state bucket | Would move the org's full resource graph out of sa-east-1, against the residency decision. Versioning is the rollback path. |
 | `trivy config` instead of `tfsec` | tfsec is end-of-life; Aqua folded it into Trivy. |
 | Management account hosts no workloads | Governance only. |
 | Alternate contact (Security) set to `+aws-security@` | AWS abuse and compromise notices route there. |
 | Identity Center home region `sa-east-1` | Cannot be changed without deleting the instance. Locked in. |
 | `AdministratorAccess` permission set capped at a 1-hour session | Default is 12 hours. A security portfolio should not ship a 12-hour admin session. |
 
-Not yet done, deliberately deferred: **centralized root access for member accounts** (Organizations banner → "Enable in IAM"). It deletes root credentials from member accounts entirely. Only makes sense once member accounts exist — do it during or after `org-root`, and record it in the threat model as eliminating T5 at the source rather than mitigating it.
+Deliberately deferred, tracked as step 3 of `org-root` above: **centralized root access for member accounts**.
 
 ## Conventions
 
 - `live/<stack>/` are root modules, one per account/stage. `modules/` are reusable. Never `terraform apply` from `modules/`.
 - Every stack pins `required_version` and provider versions.
 - Every stack sets `allowed_account_ids` on the provider — a wrong profile must fail, not apply.
-- `terraform.tfvars` is gitignored and holds the account ID and profile name; `example.tfvars` is the committed template.
+- `terraform.tfvars` is gitignored and holds the account ID and profile name; `example.tfvars` is the committed template. Same pattern for `backend.hcl` / `example.backend.hcl`.
+- Scanner suppressions carry the reason inline (`# checkov:skip=ID:why`, commented `.trivyignore` entries) and, when the finding is real rather than a false positive, a threat-model ID and the stack that closes it. A bare suppression is worse than the finding.
 - Resource names prefixed with `var.project` (`awlz`).
 - Docs are part of the deliverable. A change that alters the threat surface updates `docs/threat-model.md` in the same commit.
 - Commits: Conventional Commits, author `heavensnipe@gmail.com` (registered on the GitHub account, so attribution links).
@@ -70,12 +85,24 @@ Not yet done, deliberately deferred: **centralized root access for member accoun
 
 The user is on Windows 11 with PowerShell 7. These have already cost time:
 
-- `terraform` lives at `C:\Users\Pedro\AppData\Local\Microsoft\WinGet\Packages\Hashicorp.Terraform_Microsoft.Winget.Source_8wekyb3d8bbwe\terraform.exe`. A shell opened before the install will not have it on `PATH`.
-- `checkov` is installed but its Scripts directory may not be on `PATH`: `C:\Users\Pedro\AppData\Local\Python\pythoncore-3.14-64\Scripts`. `python -m checkov` always works.
+- **Nothing is on `PATH` in a fresh shell.** Winget installs to per-package directories and creates no shims here. Prepend these before running anything:
+
+  ```powershell
+  $wg = "$env:LOCALAPPDATA\Microsoft\WinGet\Packages"
+  $env:PATH = "$wg\Hashicorp.Terraform_Microsoft.Winget.Source_8wekyb3d8bbwe;" +
+              "$wg\AquaSecurity.Trivy_Microsoft.Winget.Source_8wekyb3d8bbwe;" +
+              "$wg\TerraformLinters.tflint_Microsoft.Winget.Source_8wekyb3d8bbwe;" +
+              "C:\Program Files\Amazon\AWSCLIV2;" +
+              "$env:LOCALAPPDATA\Python\pythoncore-3.14-64\Scripts;$env:PATH"
+  ```
+
+- `python -m checkov` **does not work** — checkov is a package with no `__main__`. Use `checkov.cmd` from the Scripts directory above.
+- PowerShell mangles native-CLI arguments containing `=`. `terraform plan -var-file=x -out=y` fails with `Too many command line arguments`. Build an array and splat it: `& terraform @("plan","-var-file=terraform.tfvars","-out=tfplan")`.
+- `trivy config` rejects `--no-color`. Bare `trivy config .` works.
 - PowerShell `&&` short-circuits — a chained version check stops at the first failure and the rest silently never run.
 - `terraform -chdir=$var` does not expand the variable in PowerShell. Use `Set-Location` instead.
 - Makefiles here assume a POSIX shell. Run them from Git Bash or WSL.
-- Installed: terraform 1.15.8, tflint 0.64.0, trivy 0.72.0, checkov 3.3.8, aws-cli 2.36.9.
+- Installed: terraform 1.15.8, tflint 0.64.0, trivy 0.72.0, checkov 3.3.8, aws-cli 2.36.9. Provider pinned at `hashicorp/aws` 6.56.0 via the committed lock file.
 
 ## Working style the user expects
 
