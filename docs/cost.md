@@ -15,7 +15,7 @@ Monthly run cost of the landing zone itself, excluding workloads. Filled in from
 
 ## Keeping it cheap
 
-- Budget with an actions-enabled alarm at a hard ceiling.
+- Budget with an actions-enabled alarm at a hard ceiling, created **before** the first apply.
 - Config recorder scoped, not all-resources.
 - Demo workload accounts torn down between sessions (`make destroy`).
 - Region allow-list keeps stray resources from appearing where nobody looks at the bill.

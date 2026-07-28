@@ -28,8 +28,14 @@ jobs:
         uses: terraform-linters/setup-tflint@v4
       - run: tflint --recursive --format compact
 
-      - name: tfsec
-        uses: aquasecurity/tfsec-action@v1.0.3
+      # tfsec is EOL — folded into Trivy's `config` scanner, same rule engine
+      - name: trivy — IaC misconfiguration scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
 
       - name: checkov
         uses: bridgecrewio/checkov-action@master

@@ -32,7 +32,7 @@ The AWS Organization and its guardrails: management account, security/log-archiv
 | T4 | Info disclosure | Log archive bucket read by a member account | Low | High | Dedicated account, bucket policy + KMS key policy deny cross-account read | — |
 | T5 | Elevation | Member account creates a role that bypasses guardrails | Med | High | SCP denies IAM changes to `aegis-*` roles; permission boundary required for role creation | Boundary enforcement needs a Config rule to catch drift |
 | T6 | Info disclosure | Terraform state read from a public/misconfigured bucket | Low | High | Private bucket in security account, SSE-KMS, BPA, DynamoDB lock | — |
-| T7 | Tampering | Malicious Terraform merged | Med | High | Required review, `tfsec`/`checkov`/`tflint` gates, plan-only on PR, apply gated by environment approval | Reviewer fatigue |
+| T7 | Tampering | Malicious Terraform merged | Med | High | Required review, `trivy config`/`checkov`/`tflint` gates, plan-only on PR, apply gated by environment approval | Reviewer fatigue |
 | T8 | DoS | Guardrails lock out legitimate emergency access | Low | Med | Documented break-glass role + procedure, alarmed on use | Break-glass must be tested, not just documented |
 
 ## Detection mapping

@@ -16,7 +16,7 @@ lint: ## tflint across modules
 	tflint --recursive
 
 sec: ## static security analysis
-	tfsec .
+	trivy config . --severity HIGH,CRITICAL --exit-code 1
 	checkov -d . --quiet --compact
 
 plan: ## plan a stack: make plan STACK=live/org-root

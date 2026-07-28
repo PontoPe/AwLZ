@@ -48,7 +48,7 @@ Summary — full version in [docs/threat-model.md](docs/threat-model.md).
 | T4 | Log tampering / deletion | Dedicated log-archive account, KMS CMK with restrictive key policy, versioning + Object Lock | `modules/logging` |
 | T5 | Privilege escalation via IAM in member accounts | SCP denies changes to guardrail roles; permission boundaries | `policies/scp`, `modules/iam-oidc` |
 | T6 | Terraform state exfiltration (state holds secrets/ARNs) | Encrypted remote state, DynamoDB lock, state bucket in security account | `live/bootstrap` |
-| T7 | Malicious/typo'd Terraform merged to main | `tflint` + `tfsec` + `checkov` gates in CI, plan-only on PR, apply on protected branch | `.github/workflows` |
+| T7 | Malicious/typo'd Terraform merged to main | `tflint` + `trivy config` + `checkov` gates in CI, plan-only on PR, apply on protected branch | `.github/workflows` |
 
 ## Layout
 
@@ -73,7 +73,7 @@ Creates the remote state bucket + lock table in the security account; everything
 | Gate | Tool | Blocking |
 |------|------|----------|
 | Format + lint | `terraform fmt`, `tflint` | yes |
-| Static security | `tfsec`, `checkov` | yes |
+| Static security | `trivy config`, `checkov` | yes |
 | Plan | `terraform plan` on PR, artifact attached | yes |
 | Apply | manual approval, `main` only, OIDC role | — |
 
@@ -99,10 +99,10 @@ CIS AWS Foundations Benchmark score **before vs after**, exported from Security 
 - [ ] `modules/iam-oidc` — GitHub OIDC provider + scoped roles
 - [ ] `modules/logging` — org trail → S3 (KMS, Object Lock) in security account
 - [ ] `modules/detection` — GuardDuty, Config, Security Hub + CIS
-- [ ] CI: fmt/tflint/tfsec/checkov/plan
+- [ ] CI: fmt/tflint/trivy/checkov/plan
 - [ ] `docs/cost.md` + CIS before/after evidence
 - [ ] Demo GIF
 
 ## Local tooling
 
-Not yet installed on the dev workstation: `terraform`, `tflint`, `tfsec`, `checkov`, `aws` CLI. See [docs/toolchain.md](docs/toolchain.md).
+Not yet installed on the dev workstation: `terraform`, `tflint`, `trivy`, `checkov`, `aws` CLI. See [docs/toolchain.md](docs/toolchain.md).
