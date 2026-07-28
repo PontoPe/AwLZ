@@ -23,7 +23,8 @@ Done:
 - Local CLI profile **`mgmt`** configured via `aws configure sso` — SSO session `pegradowski`, region `sa-east-1`, no static credentials on disk.
 - **`live/bootstrap` applied, 2026-07-28.** 9 resources. State bucket `awlz-tfstate-<mgmt-account-id>` with a CMK (alias `alias/awlz-tfstate`), rotation on. State at `bootstrap/terraform.tfstate`; local state files deleted. Verified controls listed in `live/bootstrap/README.md`.
 - **`live/org-root` applied, 2026-07-28.** 1 imported, 7 added, 1 changed. OUs Security and Workloads; accounts `awlz-log-archive` + `awlz-security` under Security, `awlz-dev` + `awlz-lab` under Workloads, all ACTIVE. Trusted access enabled for 8 principals. **Centralized root access is on** — member accounts have no root credentials.
-- Gate baseline: `live/bootstrap` tflint 0 / trivy 0 / checkov 0 failed, 6 skipped with written reasons. `live/org-root` clean on all three. Do not add a bare suppression to this repo — the justification is part of the deliverable.
+- **`live/guardrails` applied, 2026-07-28.** 3 SCPs — region allow-list, detection-service protection, guardrail-role protection — attached to `awlz-lab` **only**. Documents in `policies/scp/`. Verified from inside the account with an assumed admin role; results in `docs/evidence/scp-verification.md`, including a negative control proving the role policy is scoped rather than blanket.
+- Gate baseline: `live/bootstrap` tflint 0 / trivy 0 / checkov 0 failed, 6 skipped with written reasons. `live/org-root` and `live/guardrails` clean on all three, no suppressions. Do not add a bare suppression to this repo — the justification is part of the deliverable.
 
 The manual console phase is finished. Everything from here is Terraform.
 
@@ -43,21 +44,19 @@ cd live/org-root && terraform output          # account ids, OU ids, org id
 cd live/bootstrap && terraform output -raw backend_config
 ```
 
-Immediate next step — `policies/scp`, currently an empty directory:
+Immediate next step — `modules/logging`, currently an empty directory:
 
-1. Region deny — allow-list `sa-east-1` + `us-east-1` only.
-2. CloudTrail protection — deny `cloudtrail:StopLogging`, `DeleteTrail`, `PutEventSelectors` (T2).
-3. Guardrail-role protection — deny IAM writes against `awlz-*` roles (T5).
-4. Attach to OU IDs from `terraform output organizational_unit_ids` in `live/org-root`. Security OU takes the strict policy, Workloads the permissive one.
-5. **SCPs do not apply to the management account.** Anything that must hold there is a separate control, not an SCP.
-6. Test on the `lab` account before attaching anywhere else. A wrong SCP locks you out of the account it is attached to, and only the management account can detach it.
+1. Org-wide CloudTrail trail in the management account, delivering to S3 in `awlz-log-archive`. Trusted access for `cloudtrail.amazonaws.com` is already enabled.
+2. Bucket in the log archive account: KMS CMK, Object Lock in compliance mode, no delete path. Object Lock **must** be enabled at bucket creation — it cannot be added later.
+3. Also wire S3 server access logging for the state bucket into this archive. That closes **T6b** and lets the suppressions in `live/bootstrap/.trivyignore` and `main.tf` be deleted.
+4. Cross-account: this stack writes into `awlz-log-archive`, so it needs a second provider aliased onto `OrganizationAccountAccessRole` in that account. There are no static credentials — assume the role via `assume_role` in the provider block.
 
 Then, in order:
 
-7. `modules/logging` — org trail → S3 in the log-archive account, KMS + Object Lock. Also closes T6b (state bucket access logging).
-8. `modules/iam-oidc` — GitHub OIDC provider + roles scoped to `repo:PontoPe/AwLZ:*`. CI (`.github/workflows/ci.yml`) has the plan job stubbed out waiting on this.
-9. `modules/detection` — GuardDuty, Config, Security Hub + CIS. Delegate admin to `awlz-security`, not the management account.
-10. Evidence: CIS score before vs after, cost actuals, demo GIF.
+5. Widen `scp_targets` in `live/guardrails` from `awlz-lab` to the Workloads OU, then Security. Re-run the probes in `docs/evidence/scp-verification.md` after each step.
+6. `modules/iam-oidc` — GitHub OIDC provider + roles scoped to `repo:PontoPe/AwLZ:*`. CI (`.github/workflows/ci.yml`) has the plan job stubbed out waiting on this.
+7. `modules/detection` — GuardDuty, Config, Security Hub + CIS. Delegate admin to `awlz-security`, not the management account.
+8. Evidence: CIS score before vs after, cost actuals, demo GIF.
 
 Before the repo goes public: commit `51ce5c0` put the management account ID in this file, and it is already pushed. Either scrub it from history or accept it as low-sensitivity. Nothing after that commit adds concrete IDs.
 
@@ -82,6 +81,9 @@ Before the repo goes public: commit `51ce5c0` put the management account ID in t
 | Centralized root access on, via Terraform | `aws_iam_organizations_features` with `RootCredentialsManagement` + `RootSessions`. Member accounts have no root credentials. Break-glass is `OrganizationAccountAccessRole` assumed from the management account. Threat model T9. |
 | Organization adopted by `import` block, managed not read | Makes trusted access declarative — a new service is one line in `var.service_access_principals`. Consequence: `aws_organizations_organization` is global and singular, so only `live/org-root` may manage it. |
 | Member accounts: `close_on_deletion = false`, `prevent_destroy` everywhere | Closing an account starts a 90-day suspension that burns its root email. A destroy should detach, never close. |
+| No blanket root-deny SCP | Root credentials are already deleted from member accounts, so there is nothing to deny, and a root deny would block `RootSessions` — the break-glass path. Reasoning in `policies/scp/README.md`; revisit only if centralized root access is disabled. |
+| SCPs attach to accounts/OUs, never the org root | The management account is exempt from SCPs regardless, and root attachment makes the blast radius harder to reason about. Root exemption is the only recovery path from a bad policy — it must stay unbroken. |
+| SCP documents in `policies/scp/*.json`, applied from `live/guardrails` | Root modules live under `live/` by convention; `policies/` holds documents. Separate from `org-root` so an SCP rollback does not share a plan with account creation. |
 
 ## Conventions
 
