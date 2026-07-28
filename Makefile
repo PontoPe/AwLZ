@@ -6,8 +6,8 @@ TF_DIRS := $(shell find live modules -name '*.tf' -exec dirname {} \; 2>/dev/nul
 help: ## show targets
 	@grep -hE '^[a-z-]+:.*##' $(MAKEFILE_LIST) | sed 's/:.*##/\t/' | column -t -s $$'\t'
 
-bootstrap: ## create remote state bucket + lock table (run once, local backend)
-	cd live/bootstrap && terraform init && terraform apply
+bootstrap: ## create the remote state bucket (run once, starts on a local backend)
+	cd live/bootstrap && terraform init && terraform apply -var-file=terraform.tfvars
 
 fmt: ## format all terraform
 	terraform fmt -recursive

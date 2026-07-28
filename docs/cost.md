@@ -10,8 +10,10 @@ Monthly run cost of the landing zone itself, excluding workloads. Filled in from
 | GuardDuty | events + VPC flow log volume | | | biggest variable; 30-day trial first |
 | AWS Config | configuration items recorded | | | scope recorders to the resource types that matter |
 | Security Hub | checks per account | | | CIS standard only |
-| DynamoDB (TF lock) | on-demand, negligible | ~0.00 | | |
+| S3 state bucket | KB of state + versions | ~0.00 | | native S3 locking — no DynamoDB table needed since TF 1.10 |
 | **Total** | | | | |
+
+Home region is `sa-east-1`, which runs roughly 30-50% above `us-east-1` on most line items. Deliberate: data residency in Brazil is the point, and the delta on a governance-only footprint is measured in single dollars.
 
 ## Keeping it cheap
 

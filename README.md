@@ -47,7 +47,7 @@ Summary — full version in [docs/threat-model.md](docs/threat-model.md).
 | T3 | Resource sprawl in unmonitored regions | SCP denies all actions outside allowed regions | `policies/scp` |
 | T4 | Log tampering / deletion | Dedicated log-archive account, KMS CMK with restrictive key policy, versioning + Object Lock | `modules/logging` |
 | T5 | Privilege escalation via IAM in member accounts | SCP denies changes to guardrail roles; permission boundaries | `policies/scp`, `modules/iam-oidc` |
-| T6 | Terraform state exfiltration (state holds secrets/ARNs) | Encrypted remote state, DynamoDB lock, state bucket in security account | `live/bootstrap` |
+| T6 | Terraform state exfiltration (state holds secrets/ARNs) | S3 remote state with a customer-managed KMS key, TLS-only bucket policy, native S3 locking | `live/bootstrap` |
 | T7 | Malicious/typo'd Terraform merged to main | `tflint` + `trivy config` + `checkov` gates in CI, plan-only on PR, apply on protected branch | `.github/workflows` |
 
 ## Layout
@@ -93,7 +93,7 @@ CIS AWS Foundations Benchmark score **before vs after**, exported from Security 
 
 ## Roadmap
 
-- [ ] `live/bootstrap` — remote state + lock
+- [x] `live/bootstrap` — remote state bucket, KMS CMK, native S3 locking
 - [ ] `modules/organizations` — OUs, account factory
 - [ ] `policies/scp` — region deny, CloudTrail protect, root user deny
 - [ ] `modules/iam-oidc` — GitHub OIDC provider + scoped roles
