@@ -1,0 +1,9 @@
+# Suppressions for the bootstrap stack. Every line needs a reason and a fix path.
+#
+# AWS-0089 — "Bucket has logging disabled" (LOW)
+#   Same finding as checkov CKV_AWS_18. S3 server access logging needs a target
+#   bucket in the log-archive account, which does not exist until live/org-root
+#   creates it. Wiring the state bucket to log into itself would be worse than
+#   the gap. Removed when modules/logging lands.
+#   Tracked: docs/threat-model.md T6b.
+AWS-0089

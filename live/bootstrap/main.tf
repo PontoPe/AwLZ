@@ -27,6 +27,10 @@ resource "aws_kms_alias" "state" {
 }
 
 data "aws_iam_policy_document" "state_key" {
+  # checkov:skip=CKV_AWS_109:KMS key policies require an unscoped account-root delegation. Without it the key is orphaned and unrecoverable — AWS documents this statement as mandatory.
+  # checkov:skip=CKV_AWS_111:Same. `kms:*` on the account root is the delegation statement, not a grant to any principal; actual access is gated by IAM.
+  # checkov:skip=CKV_AWS_356:A key policy's resource is always the key itself. `*` here cannot mean anything else.
+
   # Without this the key is orphaned — IAM cannot grant access to a key whose
   # policy does not delegate to the account.
   statement {
@@ -71,6 +75,9 @@ data "aws_iam_policy_document" "state_key" {
 # ---------------------------------------------------------------------------
 
 resource "aws_s3_bucket" "state" {
+  # checkov:skip=CKV_AWS_144:Cross-region replication is refused deliberately. Data residency is sa-east-1 (see docs/architecture.md); replicating state elsewhere would move the org's full resource graph out of Brazil. Versioning below is the rollback path.
+  # checkov:skip=CKV2_AWS_62:Event notifications on a state bucket have no consumer. State access is audited by the org CloudTrail once modules/logging lands.
+  # checkov:skip=CKV_AWS_18:Server access logging deferred — the log-archive account does not exist until live/org-root runs. Tracked in docs/threat-model.md as T6b; wired up in modules/logging.
   bucket = local.state_bucket
 
   # Deleting this bucket destroys the ability to manage the entire org.
