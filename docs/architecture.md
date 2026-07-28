@@ -1,4 +1,4 @@
-# Architecture — Aegis Landing Zone
+# Architecture — AwLZ
 
 The high-level diagram lives in the [README](../README.md). This file records **why**, not what.
 

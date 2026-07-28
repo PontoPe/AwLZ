@@ -1,4 +1,4 @@
-# Threat model — Aegis Landing Zone
+# Threat model — AwLZ
 
 ## Scope
 
@@ -37,7 +37,7 @@ The AWS Organization and its guardrails: management account, security/log-archiv
 
 ## Detection mapping
 
-Anything here that cannot be *prevented* must be *detected* — those go to [SentinelResponse](../../SentinelResponse).
+Anything here that cannot be *prevented* must be *detected* — those go to [PontoAnti-Crack](../../PontoAnti-Crack).
 
 | Threat | Detection |
 |--------|-----------|

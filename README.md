@@ -1,4 +1,4 @@
-# Aegis Landing Zone
+# AwLZ — AWS Landing Zone
 
 Multi-account AWS landing zone built with Terraform: guardrails by default, zero long-lived credentials, and continuous compliance evidence.
 
