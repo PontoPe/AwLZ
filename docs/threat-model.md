@@ -37,7 +37,7 @@ The AWS Organization and its guardrails: management account, security/log-archiv
 
 ## Detection mapping
 
-Anything here that cannot be *prevented* must be *detected* — those go to [PontoAnti-Crack](../../PontoAnti-Crack).
+Anything here that cannot be *prevented* must be *detected* — those go to [PontoAntiCrack](../../PontoAntiCrack).
 
 | Threat | Detection |
 |--------|-----------|
