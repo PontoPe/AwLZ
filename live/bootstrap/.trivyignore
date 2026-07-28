@@ -1,9 +1,17 @@
-# Suppressions for the bootstrap stack. Every line needs a reason and a fix path.
+# Suppressions for the bootstrap stack. Every line needs a reason.
 #
 # AWS-0089 — "Bucket has logging disabled" (LOW)
-#   Same finding as checkov CKV_AWS_18. S3 server access logging needs a target
-#   bucket in the log-archive account, which does not exist until live/org-root
-#   creates it. Wiring the state bucket to log into itself would be worse than
-#   the gap. Removed when modules/logging lands.
-#   Tracked: docs/threat-model.md T6b.
+#   Literally true: S3 server access logging is off, and stays off.
+#
+#   It cannot be pointed at the log archive. S3 requires a server access
+#   logging target bucket to be owned by the same account as the source, and
+#   the archive is deliberately in a different account. Logging into a bucket
+#   in the same account as the thing being audited defeats the purpose.
+#
+#   Access to this bucket is instead recorded as CloudTrail S3 **data events**,
+#   scoped to exactly this bucket in modules/logging, and delivered to the
+#   object-locked archive in awlz-log-archive. That is a stronger control than
+#   the one the check is asking for.
+#
+#   Threat model: T6b, closed.
 AWS-0089

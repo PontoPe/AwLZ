@@ -77,7 +77,7 @@ data "aws_iam_policy_document" "state_key" {
 resource "aws_s3_bucket" "state" {
   # checkov:skip=CKV_AWS_144:Cross-region replication is refused deliberately. Data residency is sa-east-1 (see docs/architecture.md); replicating state elsewhere would move the org's full resource graph out of Brazil. Versioning below is the rollback path.
   # checkov:skip=CKV2_AWS_62:Event notifications on a state bucket have no consumer. State access is audited by the org CloudTrail once modules/logging lands.
-  # checkov:skip=CKV_AWS_18:Server access logging deferred — the log-archive account does not exist until live/org-root runs. Tracked in docs/threat-model.md as T6b; wired up in modules/logging.
+  # checkov:skip=CKV_AWS_18:Server access logging stays off. S3 requires the logging target bucket to be owned by the same account as the source, so it could never deliver to awlz-log-archive, and logging into the same account as the audited bucket defeats the point. Access is recorded as CloudTrail S3 data events scoped to this bucket in modules/logging, landing in the object-locked archive. T6b, closed.
   bucket = local.state_bucket
 
   # Deleting this bucket destroys the ability to manage the entire org.
