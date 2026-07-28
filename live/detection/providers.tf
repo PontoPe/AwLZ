@@ -6,7 +6,7 @@
 
 provider "aws" {
   region              = var.region
-  profile             = var.profile
+  profile             = var.profile != "" ? var.profile : null
   allowed_account_ids = [var.account_id]
 
   default_tags {
@@ -17,7 +17,7 @@ provider "aws" {
 provider "aws" {
   alias               = "security"
   region              = var.region
-  profile             = var.profile
+  profile             = var.profile != "" ? var.profile : null
   allowed_account_ids = [var.account_ids.security]
 
   assume_role {
@@ -33,7 +33,7 @@ provider "aws" {
 provider "aws" {
   alias               = "log_archive"
   region              = var.region
-  profile             = var.profile
+  profile             = var.profile != "" ? var.profile : null
   allowed_account_ids = [var.account_ids.log-archive]
 
   assume_role {
@@ -49,7 +49,7 @@ provider "aws" {
 provider "aws" {
   alias               = "dev"
   region              = var.region
-  profile             = var.profile
+  profile             = var.profile != "" ? var.profile : null
   allowed_account_ids = [var.account_ids.dev]
 
   assume_role {
@@ -65,7 +65,7 @@ provider "aws" {
 provider "aws" {
   alias               = "lab"
   region              = var.region
-  profile             = var.profile
+  profile             = var.profile != "" ? var.profile : null
   allowed_account_ids = [var.account_ids.lab]
 
   assume_role {

@@ -108,7 +108,77 @@ jobs:
         working-directory: ${{ matrix.stack }}
         run: terraform validate -no-color
 
-# There is deliberately no `plan` job yet. Planning needs AWS credentials,
-# which means the OIDC role from modules/iam-oidc. A job that echoes a TODO
-# and exits 0 is a green check that asserts nothing — worse than a missing
-# one, because it looks like coverage. It comes back when the role exists.
+  # Real plan against real AWS, using the read-only OIDC role from
+  # live/ci-oidc. No access key exists to leak: GitHub mints a short-lived
+  # token, AWS exchanges it, and the role's trust policy pins the `sub` claim
+  # to this repository.
+  #
+  # Concrete IDs come from repository *variables*, not from git. They are
+  # identifiers rather than secrets, but the repo keeps them out of version
+  # control by convention and the same convention applies here.
+  plan:
+    name: plan
+    needs: static
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write # required to request the OIDC token
+
+    strategy:
+      fail-fast: false
+      matrix:
+        stack:
+          [
+            live/bootstrap,
+            live/org-root,
+            live/guardrails,
+            live/logging,
+            live/detection,
+            live/ci-oidc,
+          ]
+
+    env:
+      # Terraform ignores TF_VAR_* for variables a stack does not declare, so
+      # one union of values covers every stack.
+      TF_VAR_profile: "" # provider falls back to the OIDC credentials
+      TF_VAR_region: ${{ vars.AWS_REGION }}
+      TF_VAR_account_id: ${{ vars.TF_ACCOUNT_ID }}
+      TF_VAR_organization_id: ${{ vars.TF_ORGANIZATION_ID }}
+      TF_VAR_log_archive_account_id: ${{ vars.TF_LOG_ARCHIVE_ID }}
+      TF_VAR_state_bucket_arn: ${{ vars.TF_STATE_BUCKET_ARN }}
+      TF_VAR_state_kms_key_arn: ${{ vars.TF_STATE_KMS_KEY }}
+      TF_VAR_account_ids: ${{ vars.TF_ACCOUNT_IDS }}
+      TF_VAR_scp_targets: ${{ vars.TF_SCP_TARGETS }}
+
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: awlz-ci-plan
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: "1.15.8"
+          terraform_wrapper: false
+
+      - name: init
+        working-directory: ${{ matrix.stack }}
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=$(basename ${{ matrix.stack }})/terraform.tfstate" \
+            -backend-config="region=${{ vars.AWS_REGION }}" \
+            -backend-config="encrypt=true" \
+            -backend-config="kms_key_id=${{ vars.TF_STATE_KMS_KEY }}" \
+            -backend-config="use_lockfile=true"
+
+      # -lock=false because the plan role is denied state writes on purpose.
+      # A read-only plan has no business taking a lock that a failed run would
+      # leave behind for someone to force-unlock.
+      - name: plan
+        working-directory: ${{ matrix.stack }}
+        run: terraform plan -input=false -lock=false -no-color

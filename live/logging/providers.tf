@@ -1,6 +1,6 @@
 provider "aws" {
   region  = var.region
-  profile = var.profile
+  profile = var.profile != "" ? var.profile : null
 
   allowed_account_ids = [var.account_id]
 
@@ -17,7 +17,7 @@ provider "aws" {
 provider "aws" {
   alias   = "log_archive"
   region  = var.region
-  profile = var.profile
+  profile = var.profile != "" ? var.profile : null
 
   allowed_account_ids = [var.log_archive_account_id]
 

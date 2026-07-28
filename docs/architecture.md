@@ -86,6 +86,46 @@ Each decision: context, options, choice, consequence. Short. Append, never rewri
 - **Decision:** Partial backend, with `example.backend.hcl` as the committed template.
 - **Consequences:** Every `init` needs `-backend-config=backend.hcl`, which CI already assumed. Account IDs are identifiers, not credentials — this is consistency with a stated convention rather than a claim that leaking one is dangerous. Evidence documents redact them for the same reason.
 
+### ADR-011 — Object Lock in COMPLIANCE mode, with short retention
+
+- **Status:** accepted
+- **Context:** The log archive exists so that an attacker holding the management account cannot erase the record. Versioning and a bucket policy do not survive an attacker who holds the account that owns them.
+- **Options:** Versioning only; Object Lock GOVERNANCE; Object Lock COMPLIANCE.
+- **Decision:** COMPLIANCE, 30 days.
+- **Consequences:** No principal can delete a locked object before expiry — not the account root, not AWS Support. GOVERNANCE would be bypassable by anyone holding `s3:BypassGovernanceRetention`, which is exactly the principal being defended against. The cost is symmetrical and permanent for the retention window: the bucket cannot be emptied or destroyed, and `terraform destroy` will fail. Thirty days is short on purpose — this is a portfolio organization on a hard budget, and under COMPLIANCE every extra day is storage nobody can reclaim. A production archive would use years and size the bill for it.
+
+### ADR-012 — S3 data events instead of server access logging for T6b
+
+- **Status:** accepted, supersedes the original plan for T6b
+- **Context:** Reads of the Terraform state object left no trace. The plan was S3 server access logging on the state bucket, delivered to the log archive.
+- **Options:** Server access logging to the archive account; server access logging within the management account; CloudTrail S3 data events.
+- **Decision:** Data events, scoped to the state bucket alone.
+- **Consequences:** The original plan was not implementable — S3 requires a server access logging target bucket to be owned by the **same account** as the source, so delivery to `awlz-log-archive` was never possible. Logging within the management account would put the audit record in the same account as the audited bucket, which defeats the purpose. Data events land in the object-locked archive instead. They bill per event, so the bucket list is an explicit allow-list rather than "all S3" — that is the difference between cents and the largest line on the invoice.
+
+### ADR-013 — Detection delegated to the security account
+
+- **Status:** accepted
+- **Context:** GuardDuty, Security Hub, Config and Access Analyzer can each be administered from the management account or delegated to another.
+- **Options:** Administer from management; delegate to `awlz-security`.
+- **Decision:** Delegate all four.
+- **Consequences:** If the management account is compromised, the findings that would reveal it are not in the same blast radius. The cost is complexity: `modules/detection` needs three providers, and Config has no organization-wide auto-enable at all, so a recorder is created per account with a provider each. Terraform cannot iterate over providers, so those five blocks are written out longhand and a `check` block asserts they landed in five distinct accounts.
+
+### ADR-014 — Guardrails exempt their own deployment principals
+
+- **Status:** accepted
+- **Context:** Two SCPs blocked the landing zone from deploying itself. `protect-security-services` denied `config:PutConfigurationRecorder`, which is how a recorder is created as well as how one is neutered. `protect-guardrail-roles` denied `iam:AttachRolePolicy` on `awlz-*`, and the Config aggregator role is `awlz-config-aggregator`.
+- **Options:** Rename resources outside the protected prefix; drop the offending actions; exempt the deployment principals from the subset of actions that deployment needs.
+- **Decision:** Split each policy. Destructive actions — delete, stop, disable, disassociate — are denied to everyone with no exemption. Actions that also occur during legitimate deployment are denied except to `OrganizationAccountAccessRole` and `awlz-*` roles. `OrganizationAccountAccessRole` itself keeps unconditional protection, because nothing legitimately edits the break-glass path.
+- **Consequences:** A guardrail that prevents the landing zone from existing is not protecting anything. The exemption is honest about its own limit: a principal able to create a role matching `awlz-*` inherits it, which is bounded only by the same statement denying IAM writes on that prefix to everyone else. Both collisions were found by an apply failing, not by review — recorded in the evidence rather than quietly patched.
+
+### ADR-015 — The CI apply role is AdministratorAccess
+
+- **Status:** accepted
+- **Context:** The apply role manages Organizations, SCPs, KMS key policies and cross-account roles.
+- **Options:** Enumerate least privilege; use AdministratorAccess and constrain who may assume it.
+- **Decision:** AdministratorAccess, with the control placed entirely on the trust policy.
+- **Consequences:** An accurate least-privilege policy for a role that manages the organization is administrator with extra steps and a false sense of containment — and it fails open as new services are added, at the worst moment. The real boundary is the `sub` claim: only a workflow that has passed the `production` GitHub Environment can assume it. The plan role, which runs on unreviewed pull requests, is read-only and explicitly denied state writes. Sessions cap at one hour and every action lands in the org trail.
+
 ---
 
 ## Open questions

@@ -13,6 +13,7 @@ variable "region" {
 variable "profile" {
   description = "Local AWS CLI profile backed by IAM Identity Center."
   type        = string
+  default     = ""
 }
 
 variable "account_id" {

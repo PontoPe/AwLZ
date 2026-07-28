@@ -2,7 +2,7 @@
 
 Multi-account AWS landing zone built with Terraform: guardrails by default, zero long-lived credentials, and compliance evidence that is produced rather than claimed.
 
-> **Status:** organization, guardrails and remote state are applied and verified against a live AWS organization. Logging, CI federation and detection are not built yet. The [roadmap](#roadmap) marks exactly what exists.
+> **Status:** every stack is applied against a live AWS organization. Detection landed on 2026-07-28, so CIS scores and cost actuals are still accumulating — those two are marked pending below rather than guessed at. The [roadmap](#roadmap) marks exactly what exists.
 
 ---
 
@@ -28,19 +28,19 @@ flowchart TB
         end
     end
 
-    GHA["GitHub Actions"] -.->|OIDC AssumeRole<br/>not built yet| MGMT
+    GHA["GitHub Actions"] -->|OIDC AssumeRole<br/>no static keys| MGMT
     MGMT -->|"SCPs: region allow-list,<br/>protect detection,<br/>protect guardrail roles"| OU_WL
     MGMT --> OU_SEC
-    DEV & LAB -.->|not built yet| TRAIL["CloudTrail org trail"]
-    TRAIL -.-> LOG
-    DEV & LAB -.-> GD["GuardDuty"] -.-> SHUB["Security Hub<br/>CIS benchmark"]
-    SHUB -.-> EVID["docs/evidence/"]
+    DEV & LAB -->|org trail| TRAIL["CloudTrail org trail"]
+    TRAIL --> LOG
+    DEV & LAB --> GD["GuardDuty"] --> SHUB["Security Hub<br/>CIS benchmark"]
+    SHUB -.-> EVID["docs/evidence/<br/>CIS score pending"]
 
     classDef todo stroke-dasharray: 5 5
     class GHA,TRAIL,GD,SHUB,EVID todo
 ```
 
-Dashed = not built yet. Decisions and their consequences: [docs/architecture.md](docs/architecture.md).
+Dashed = not yet produced. Decisions and their consequences: [docs/architecture.md](docs/architecture.md).
 
 ## Threat model
 
@@ -48,14 +48,14 @@ Summary — full version with likelihood, impact and residual risk in [docs/thre
 
 | # | Threat | Control | Status |
 |---|--------|---------|--------|
-| T1 | CI credential theft → account takeover | GitHub OIDC, no static keys, role scoped by `sub` claim | not built — `modules/iam-oidc` |
+| T1 | CI credential theft → account takeover | GitHub OIDC, no static keys, role trust pinned to exact `sub` claims | **applied**, `live/ci-oidc` |
 | T2 | Attacker disables logging to hide activity | SCP denies destroying CloudTrail/Config/GuardDuty/Security Hub | **applied**, `live/guardrails` |
 | T3 | Resource sprawl in unmonitored regions | SCP region allow-list | **applied + verified** |
-| T4 | Log tampering or deletion | Dedicated log-archive account, KMS CMK, Object Lock | not built — `modules/logging` |
+| T4 | Log tampering or deletion | Dedicated log-archive account, CMK held there, Object Lock COMPLIANCE | **applied + verified** |
 | T5 | Privilege escalation via IAM in member accounts | SCP denies IAM writes on guardrail roles | **partial** — permission boundaries still missing |
 | T6 | Terraform state exfiltration | S3 + customer-managed KMS key, TLS-only policy, native S3 locking | **applied** |
-| T6b | State object read or overwritten untraced | Versioning + CloudTrail; S3 access logging | **open** — needs `modules/logging` |
-| T7 | Malicious or typo'd Terraform merged | `tflint` + `trivy config` + `checkov`, plan on PR, gated apply | **partial** — gates run, branch protection not configured |
+| T6b | State object read or overwritten untraced | CloudTrail S3 data events scoped to the state bucket | **closed** |
+| T7 | Malicious or typo'd Terraform merged | `tflint` + `trivy config` + `checkov`, real plan on PR, gated apply | **applied** — ruleset requires PRs; status checks not yet required |
 | T8 | Guardrails lock out emergency access | Break-glass role, documented and alarmed | **partial** — path exercised, no alarm |
 | T9 | Member account root used outside Identity Center | Root credentials **deleted** from member accounts | **eliminated**, `live/org-root` |
 
@@ -66,7 +66,10 @@ live/bootstrap/    remote state: S3 + KMS CMK, native locking      applied
 live/org-root/     OUs, member accounts, centralized root access   applied
 live/guardrails/   creates and attaches the SCPs                   applied
 policies/scp/      the SCP documents
-modules/           logging, iam-oidc, detection, config-rules      not built
+live/logging/      org trail into an object-locked archive account   applied
+live/detection/    GuardDuty, Security Hub, Config, Access Analyzer  applied
+live/ci-oidc/      GitHub OIDC provider + plan and apply roles       applied
+modules/           logging, detection, config-recorder, iam-oidc
 docs/              architecture, threat model, cost, evidence
 ```
 
@@ -97,20 +100,26 @@ State lives in the **management** account, not the security account. That is a d
 | Format + lint | `terraform fmt -check`, `tflint --recursive` | running |
 | Static security | `trivy config`, `checkov` | running |
 | Validate | `terraform init -backend=false` + `validate`, per stack | running |
-| Plan on PR | `terraform plan` | **absent** — needs the OIDC role |
-| Gated apply | environment approval, `main` only | **absent** — needs the OIDC role |
+| Plan on PR | `terraform plan` against real AWS, read-only OIDC role | running |
+| Gated apply | `production` environment, `main` only | role exists; workflow step not wired |
 
-Current gate baseline across applied stacks: **0 findings**, with six documented suppressions in `live/bootstrap` and none anywhere else. Every suppression carries its reason inline and, where the finding is real, a threat-model ID and the stack that closes it.
+Current gate baseline across all stacks: **0 findings** — checkov 376 passed / 0 failed / 21 skipped, trivy and tflint clean. Every suppression carries its reason inline and, where the finding is real, a threat-model ID and the stack that closes it.
 
 Third-party actions are pinned to commit SHAs rather than tags. A tag is mutable — whoever controls the action repository can repoint it at new code, which is T7 arriving through the back door.
 
-There is no `plan` job yet, deliberately. Planning needs credentials, which means the OIDC role. A job that echoes a TODO and exits zero is a green check asserting nothing, which is worse than a missing one because it reads as coverage.
+The plan job assumes a **read-only** role whose trust policy pins the `sub` claim with `StringEquals`, not `StringLike`. `repo:owner/name:*` would also match a fork's pull request, which is the one path that must never hold credentials. It is denied state writes and runs with `-lock=false`, so a failed run cannot leave a lock for someone to force-unlock.
 
 ## Evidence
 
 [docs/evidence/scp-verification.md](docs/evidence/scp-verification.md) — each SCP probed from inside a member account as an account administrator, since an SCP is the only thing that can deny one. Includes a negative control showing the role policy is scoped rather than blanket, and an incident where a guardrail correctly blocked cleanup of a mistake.
 
-Still to come: CIS benchmark score before vs after, cost actuals from a full billing cycle.
+[docs/evidence/logging-verification.md](docs/evidence/logging-verification.md) — the org trail delivering: a real log object under the organization prefix, and CloudWatch streams from more than one account.
+
+[docs/evidence/detection-verification.md](docs/evidence/detection-verification.md) — five Config recorders reporting `SUCCESS`, which is what proves the whole cross-account, CMK-encrypted delivery path works. Also states plainly what is *not* yet verified.
+
+**Pending, not claimed:** the CIS score and cost actuals. Detection was applied on 2026-07-28; Security Hub provisions controls over ~24 hours and Cost Explorer has no data for a new organization. A number produced today would be an artifact of timing.
+
+**On "before vs after":** the guardrails went in before Security Hub did, so there is no honest organization-wide "before" left. The replacement is `awlz-lab` as a control group — detach its SCPs, score it, reattach, score again — which measures what the guardrails actually buy. Reasoning in the detection evidence.
 
 ## Cost
 
@@ -122,11 +131,14 @@ Still to come: CIS benchmark score before vs after, cost actuals from a full bil
 - [x] `live/org-root` — OUs, member accounts, centralized root access
 - [x] `policies/scp` + `live/guardrails` — region allow-list, protect detection, protect guardrail roles
 - [x] CI: fmt / tflint / trivy / checkov
-- [ ] `modules/logging` — org trail → S3 with KMS + Object Lock in the log-archive account
-- [ ] `modules/iam-oidc` — GitHub OIDC provider + scoped roles; unblocks plan-on-PR
-- [ ] `modules/detection` — GuardDuty, Config, Security Hub + CIS, delegated to `awlz-security`
+- [x] `live/logging` — org trail → S3 with CMK + Object Lock in the log-archive account
+- [x] `live/ci-oidc` — GitHub OIDC provider + plan and apply roles
+- [x] CI: real `terraform plan` on PR against AWS
+- [x] `live/detection` — GuardDuty, Config, Security Hub + CIS, delegated to `awlz-security`
+- [ ] Wire the gated apply job to the `production` environment
 - [ ] Permission boundaries + Config rule for T5
-- [ ] CIS score before/after, cost actuals
+- [ ] Alarm on break-glass role assumption (T8)
+- [ ] CIS score via the `awlz-lab` control group; cost actuals after a billing cycle
 - [ ] Demo recording
 
 ## Toolchain
