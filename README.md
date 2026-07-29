@@ -40,7 +40,7 @@ flowchart TB
     class EVID todo
 ```
 
-Dashed = not yet produced. Decisions and their consequences: [docs/architecture.md](docs/architecture.md). Current state, open items and the traps already hit: [docs/handoff.md](docs/handoff.md).
+Dashed = not yet produced. Decisions and their consequences: [docs/architecture.md](docs/architecture.md). Current state, open items and the traps already hit: [docs/project-handbook.md](docs/project-handbook.md).
 
 ## Threat model
 
