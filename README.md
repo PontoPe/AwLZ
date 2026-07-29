@@ -37,10 +37,10 @@ flowchart TB
     SHUB -.-> EVID["docs/evidence/<br/>CIS score pending"]
 
     classDef todo stroke-dasharray: 5 5
-    class GHA,TRAIL,GD,SHUB,EVID todo
+    class EVID todo
 ```
 
-Dashed = not yet produced. Decisions and their consequences: [docs/architecture.md](docs/architecture.md).
+Dashed = not yet produced. Decisions and their consequences: [docs/architecture.md](docs/architecture.md). Current state, open items and the traps already hit: [docs/handoff.md](docs/handoff.md).
 
 ## Threat model
 
@@ -55,7 +55,7 @@ Summary — full version with likelihood, impact and residual risk in [docs/thre
 | T5 | Privilege escalation via IAM in member accounts | SCP denies IAM writes on guardrail roles | **partial** — permission boundaries still missing |
 | T6 | Terraform state exfiltration | S3 + customer-managed KMS key, TLS-only policy, native S3 locking | **applied** |
 | T6b | State object read or overwritten untraced | CloudTrail S3 data events scoped to the state bucket | **closed** |
-| T7 | Malicious or typo'd Terraform merged | `tflint` + `trivy config` + `checkov`, real plan on PR, gated apply | **applied** — ruleset requires PRs; status checks not yet required |
+| T7 | Malicious or typo'd Terraform merged | `tflint` + `trivy config` + `checkov`, real plan on PR, gated apply | **applied** — ruleset requires a PR and passing checks on `main` |
 | T8 | Guardrails lock out emergency access | Break-glass role, documented and alarmed | **partial** — path exercised, no alarm |
 | T9 | Member account root used outside Identity Center | Root credentials **deleted** from member accounts | **eliminated**, `live/org-root` |
 
@@ -101,7 +101,7 @@ State lives in the **management** account, not the security account. That is a d
 | Static security | `trivy config`, `checkov` | running |
 | Validate | `terraform init -backend=false` + `validate`, per stack | running |
 | Plan on PR | `terraform plan` against real AWS, read-only OIDC role | running |
-| Gated apply | `production` environment, `main` only | role exists; workflow step not wired |
+| Gated apply | `production` environment, `main` only | role exists; workflow step not wired yet |
 
 Current gate baseline across all stacks: **0 findings** — checkov 376 passed / 0 failed / 21 skipped, trivy and tflint clean. Every suppression carries its reason inline and, where the finding is real, a threat-model ID and the stack that closes it.
 
