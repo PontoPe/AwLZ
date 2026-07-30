@@ -1,6 +1,6 @@
 # Autonomous completion progress
 
-Last updated: **2026-07-30T14:11:12-03:00**
+Last updated: **2026-07-30T14:33:00-03:00**
 
 This is the resumable execution ledger for C1–C7. It contains no concrete
 account IDs, ARNs, organization IDs, email addresses, or credentials.
@@ -68,6 +68,29 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
   security account had evaluated 35 controls, while accounts enabled today had
   evaluated only 17–20 of 36. Those partial scores are not an admissible
   baseline and will not be used for the control experiment.
+- At `2026-07-30T14:33:00-03:00`, lab reached denominator 35 and log archive
+  reached 36. Dev remained at 18 and management at 21, so the baseline is
+  still inadmissible. PontoAntiCrack was independently idle and reported the
+  lab released with no AWS or Stratus process.
+
+### C2 — cost decision
+
+- Cost Explorer for 2026-07-28 through 2026-07-30 remains estimated; net
+  unblended cost is USD 0 and is not labelled an actual.
+- Measured inputs: 33 Config items on the latest estimated day, GuardDuty
+  accrued usage USD 0.002667, and 46 active CIS findings across 35 evaluated
+  controls in the mature security account.
+- The conservative joint projection is USD 23.77/month with CIS in all five
+  accounts, including PontoAntiCrack's documented USD 2.35 at-rest footprint.
+  This can exceed the USD 20 ceiling.
+- Decision: preserve all five standards until C3 is valid, then retain CIS only
+  in `awlz-security`, remove four explicit subscriptions and set future
+  auto-enable to `NONE`. Conservative joint result: USD 12.73/month, leaving
+  USD 7.27 buffer. The lost live per-account evidence is explicit in
+  `docs/cost.md`.
+- C6 is time-bound rather than fabricated. Earliest closed-window retry:
+  `2026-08-02T12:00:00-03:00` for the July 28–August 1 window, and only if
+  Cost Explorer returns `Estimated: false`.
 
 ### C4 — T5 implementation staged, not applied
 
@@ -118,11 +141,11 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
 | Item | State | Proof required |
 |---|---|---|
 | C1 — GuardDuty | **Proved** | Four delegated members with `RelationshipStatus: Enabled` |
-| C2 — Security Hub cost decision | In progress | Current state, usage and conservative AwLZ + PontoAntiCrack projection |
+| C2 — Security Hub cost decision | **Decided; apply after C3** | USD 23.77 five-account vs USD 12.73 security-only joint projection |
 | C3 — CIS control experiment | Pending | Stable baseline; lab with/without SCP measurements; independently verified reattachment |
 | C4 — T5 and T8 | Pending | Applied boundary adoption, Config detection, observed CloudTrail event and alarm |
 | C5 — CI least privilege | Pending | Member read-only roles and successful OIDC plans without write permissions |
-| C6 — cost actuals | Pending | Closed Cost Explorer window, or an exact earliest retry date |
+| C6 — cost actuals | **Time-bound** | Earliest retry 2026-08-02T12:00:00-03:00; require `Estimated: false` |
 | C7 — demo | Pending | Audited raw cast and rendered GIF showing one deny and one allowed read |
 
 ## Recovery invariants

@@ -123,7 +123,11 @@ The plan job assumes a **read-only** role whose trust policy pins the `sub` clai
 
 ## Cost
 
-[docs/cost.md](docs/cost.md). Governance-only footprint against a hard USD 20/month budget with alerts at 85% and 100%. Home region `sa-east-1` runs 30–50% above `us-east-1`; deliberate, for data residency.
+[docs/cost.md](docs/cost.md). The measured-input conservative joint projection
+with PontoAntiCrack is USD 23.77/month while five CIS subscriptions remain
+enabled for the control experiment, and USD 12.73 in the selected steady state
+with CIS retained in `awlz-security`. Hard ceiling USD 20/month; alerts at 85%
+and 100%.
 
 ## Roadmap
 
