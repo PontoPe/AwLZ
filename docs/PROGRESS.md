@@ -1,6 +1,6 @@
 # Autonomous completion progress
 
-Last updated: **2026-07-30T13:55:03-03:00**
+Last updated: **2026-07-30T14:11:12-03:00**
 
 This is the resumable execution ledger for C1–C7. It contains no concrete
 account IDs, ARNs, organization IDs, email addresses, or credentials.
@@ -8,7 +8,7 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
 ## Current state
 
 - Branch: `codex/awlz-autonomous-owner`
-- Active item: **C2 — Security Hub cost decision**
+- Active item: **C2/C3 — Security Hub stabilization and cost decision**
 - AWS session: management account administrator through IAM Identity Center;
   home region `sa-east-1`; validated without recording identifiers.
 - Repository gates: `fmt`, `tflint`, `trivy`, Checkov and `validate` for all six
@@ -51,8 +51,23 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
   0 destroys. The creates are four account enablements, four organization
   memberships and four CIS v3.0.0 subscriptions. Every account has
   `enable_default_standards = false`; every member has `invite = false`.
-- PontoAntiCrack remained idle with the lab released before planning. Apply is
-  pending.
+- PontoAntiCrack remained idle with the lab released before planning.
+- The reviewed apply enabled the four accounts and associated log archive, dev
+  and lab, then stopped safely because Security Hub had not yet propagated the
+  management account enablement to the delegated administrator. No standard
+  subscription or SCP was changed by the failed request.
+- Independent recovery checks proved the management hub enabled, the three
+  completed memberships `Enabled`, and management the only missing member.
+  Recovery plan digest prefix `6EEAD3F4A491` contained exactly the missing
+  management membership and four CIS subscriptions: 5 creates, 0 updates,
+  0 destroys. Applying that exact plan completed successfully.
+- All five accounts now have exactly one CIS v3.0.0 subscription, each `READY`,
+  and no default-standard subscription. The delegated administrator receives
+  findings for all four members.
+- Stabilization is still open. At `2026-07-30T14:11:12-03:00`, the long-running
+  security account had evaluated 35 controls, while accounts enabled today had
+  evaluated only 17–20 of 36. Those partial scores are not an admissible
+  baseline and will not be used for the control experiment.
 
 ## Roadmap
 

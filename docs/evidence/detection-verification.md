@@ -64,12 +64,43 @@ PostApplyTerraformPlan: NO_CHANGES
 The management exception and `CreateMembers` behavior are documented in the
 [GuardDuty API reference](https://docs.aws.amazon.com/guardduty/latest/APIReference/API_CreateMembers.html).
 
+## Security Hub existing-account enrollment
+
+Organization auto-enable did not retroactively enroll the four accounts that
+already existed. Terraform now enables Security Hub with default standards off
+in management, log archive, dev and lab, associates those accounts to the
+delegated administrator, and explicitly subscribes each of the five accounts
+to CIS v3.0.0.
+
+The first reviewed apply completed the four account enablements and three
+member associations, then stopped because the new management subscription had
+not yet propagated to the delegated administrator. No standard subscription
+or SCP changed in that failed request. Independent checks found the management
+hub enabled, three members `Enabled`, and management as the only missing
+member. A second saved plan contained exactly that membership and the four
+missing CIS subscriptions; it applied 5 added, 0 changed and 0 destroyed.
+
+Sanitized post-recovery state:
+
+```text
+management: CIS v3.0.0 READY, controls READY_FOR_UPDATES
+security: CIS v3.0.0 READY, controls READY_FOR_UPDATES
+log-archive: CIS v3.0.0 READY, controls READY_FOR_UPDATES
+dev: CIS v3.0.0 READY, controls READY_FOR_UPDATES
+lab: CIS v3.0.0 READY, controls READY_FOR_UPDATES
+Unexpected standard subscriptions: 0
+```
+
 ## Not yet verified — pending, not passing
 
 The CIS score is time-dependent. Recording it as open rather than backfilling a
 claim.
 
-**CIS score.** `StandardsStatus` is `INCOMPLETE` and `get-findings` returns zero. Security Hub provisions controls over roughly 24 hours and evaluates against Config data that does not exist yet — the recorders started minutes ago. A score captured now would read as 0% and mean nothing.
+At `2026-07-30T14:11:12-03:00`, every subscription was ready, but the four
+accounts enabled today had evaluated only 17–20 of 36 enabled controls. The
+older security account had evaluated 35. The partial scores are deliberately
+excluded from the baseline. The experiment starts only after the denominator
+is stable and the exact query, timestamp and denominator are recorded.
 
 ## The baseline problem
 
