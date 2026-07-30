@@ -98,6 +98,21 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
   remain pending. No logging resource has changed in AWS from this staged
   implementation.
 
+### C5 — read-only member plan roles staged, not applied
+
+- Added one `awlz-gha-plan-readonly` role per member account. Trust is limited
+  to the exact management OIDC plan role; each role has AWS `ReadOnlyAccess`
+  and the T5 permissions boundary.
+- The management plan role can assume only the four computed member role ARNs.
+  Logging, detection and CI provider role names now default to break-glass for
+  local apply and accept the read-only role name for CI.
+- `live/ci-oidc` is temporarily removed from this branch's plan matrix because
+  it cannot assume roles that do not exist yet. Main is unaffected. It must
+  return with logging and detection before merge.
+- Terraform validation, tflint, Trivy and Checkov pass; Checkov reports 465
+  passed, 0 failed and 66 justified skips.
+- Remote plan/apply and real OIDC plan proof remain pending.
+
 ## Roadmap
 
 | Item | State | Proof required |

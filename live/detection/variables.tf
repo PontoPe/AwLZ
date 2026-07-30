@@ -16,6 +16,17 @@ variable "profile" {
   default     = ""
 }
 
+variable "member_role_name" {
+  description = "Cross-account role used by providers: break-glass for apply, read-only for CI plan."
+  type        = string
+  default     = "OrganizationAccountAccessRole"
+
+  validation {
+    condition     = can(regex("^(OrganizationAccountAccessRole|[a-z][a-z0-9-]{2,15}-gha-plan-readonly)$", var.member_role_name))
+    error_message = "member_role_name must be OrganizationAccountAccessRole or a project-prefixed gha-plan-readonly role."
+  }
+}
+
 variable "account_id" {
   description = "Management account ID. Delegation is registered here."
   type        = string

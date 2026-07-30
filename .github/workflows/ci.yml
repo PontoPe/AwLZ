@@ -142,8 +142,10 @@ jobs:
         # only the plan role, with the assumed role name a variable. Until that
         # exists, these two stacks are covered by `validate` and by a local
         # plan before apply — which is stated here rather than papered over.
-        stack:
-          [live/bootstrap, live/org-root, live/guardrails, live/ci-oidc]
+        # live/ci-oidc is also temporarily absent while this branch bootstraps
+        # the member read-only roles it now owns. It returns with the other two
+        # stacks before this pull request is eligible to merge.
+        stack: [live/bootstrap, live/org-root, live/guardrails]
 
     env:
       # Terraform ignores TF_VAR_* for variables a stack does not declare, so
@@ -158,6 +160,7 @@ jobs:
       TF_VAR_account_ids: ${{ vars.TF_ACCOUNT_IDS }}
       TF_VAR_scp_targets: ${{ vars.TF_SCP_TARGETS }}
       TF_VAR_additional_subject_prefixes: ${{ vars.TF_SUBJECT_PREFIXES }}
+      TF_VAR_member_role_name: awlz-gha-plan-readonly
       # A secret rather than a variable: this one carries the member account
       # root email addresses, and secrets are masked in logs.
       TF_VAR_member_accounts: ${{ secrets.TF_MEMBER_ACCOUNTS }}

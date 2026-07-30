@@ -150,6 +150,14 @@ Each decision: context, options, choice, consequence. Short. Append, never rewri
 - **Decision:** Build exact role ARNs from the four validated member account IDs, match `sts:AssumeRole` plus `requestParameters.roleArn`, emit one custom metric, and alarm into an encrypted SNS topic. No email endpoint is hardcoded; subscriptions are an external notification concern.
 - **Consequences:** Every break-glass assumption can be observed within the one-minute alarm period without adding another log pipeline. The topic policy accepts alarm publication only from the management account and exact alarm ARN. T8 is not marked closed until a harmless role assumption is present in CloudTrail and the alarm is observed in `ALARM`.
 
+### ADR-019 — Cross-account CI plans use dedicated read-only roles
+
+- **Status:** accepted; deployment proof pending
+- **Context:** `live/logging` and `live/detection` need member-account providers. Reusing `OrganizationAccountAccessRole` would let code from an unreviewed pull request assume administrator in every member account, even though the management plan role itself is read-only.
+- **Options:** Keep those stacks out of CI; let the plan role assume break-glass; create one read-only role per member account.
+- **Decision:** Create `awlz-gha-plan-readonly` in each member account, trusted only by the exact management OIDC plan role. Attach AWS `ReadOnlyAccess` under the T5 boundary. Cross-account provider role names are variables: local apply defaults to `OrganizationAccountAccessRole`; CI sets the read-only name.
+- **Consequences:** A pull-request plan can refresh logging and detection state without a write path in member accounts. The management plan role receives only four exact `sts:AssumeRole` resources. The stack that creates these roles is temporarily excluded from the branch plan matrix during bootstrap and must return, together with logging and detection, before merge. C5 is not closed until real OIDC plans pass and a write simulation is denied.
+
 ---
 
 ## Open questions

@@ -2,7 +2,8 @@
 # auto-enable, so a recorder has to be created in each account individually —
 # there is no way around naming them all.
 #
-# Every one assumes OrganizationAccountAccessRole. No static credentials.
+# Local apply assumes OrganizationAccountAccessRole. CI overrides the role name
+# with the dedicated read-only role; no static credentials exist in either path.
 
 provider "aws" {
   region              = var.region
@@ -21,7 +22,7 @@ provider "aws" {
   allowed_account_ids = [var.account_ids.security]
 
   assume_role {
-    role_arn     = "arn:aws:iam::${var.account_ids.security}:role/OrganizationAccountAccessRole"
+    role_arn     = "arn:aws:iam::${var.account_ids.security}:role/${var.member_role_name}"
     session_name = "${var.project}-detection"
   }
 
@@ -37,7 +38,7 @@ provider "aws" {
   allowed_account_ids = [var.account_ids.log-archive]
 
   assume_role {
-    role_arn     = "arn:aws:iam::${var.account_ids.log-archive}:role/OrganizationAccountAccessRole"
+    role_arn     = "arn:aws:iam::${var.account_ids.log-archive}:role/${var.member_role_name}"
     session_name = "${var.project}-detection"
   }
 
@@ -53,7 +54,7 @@ provider "aws" {
   allowed_account_ids = [var.account_ids.dev]
 
   assume_role {
-    role_arn     = "arn:aws:iam::${var.account_ids.dev}:role/OrganizationAccountAccessRole"
+    role_arn     = "arn:aws:iam::${var.account_ids.dev}:role/${var.member_role_name}"
     session_name = "${var.project}-detection"
   }
 
@@ -69,7 +70,7 @@ provider "aws" {
   allowed_account_ids = [var.account_ids.lab]
 
   assume_role {
-    role_arn     = "arn:aws:iam::${var.account_ids.lab}:role/OrganizationAccountAccessRole"
+    role_arn     = "arn:aws:iam::${var.account_ids.lab}:role/${var.member_role_name}"
     session_name = "${var.project}-detection"
   }
 
