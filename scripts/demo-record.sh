@@ -16,7 +16,11 @@ FONT_FAMILY="${FONT_FAMILY:-DejaVu Sans Mono}"
 FONT_SIZE="${FONT_SIZE:-15}"
 THEME="${THEME:-asciinema}"
 SPEED="${SPEED:-0.6}"
-RENDER_IDLE_LIMIT="${RENDER_IDLE_LIMIT:-5}"
+# The driver prints in one burst, so the only idle in the cast is the shell
+# warm-up before it. At 5s that became a six-second blank opening frame — a
+# third of the GIF showing nothing. Collapsing idle to 1s keeps the pacing in
+# the render, where it belongs, rather than padding the recording.
+RENDER_IDLE_LIMIT="${RENDER_IDLE_LIMIT:-1}"
 LAST_FRAME_DURATION="${LAST_FRAME_DURATION:-6}"
 
 # AWS-specific additions: organization IDs, SSO portal URLs, email addresses,

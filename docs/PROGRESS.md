@@ -1,6 +1,6 @@
 # Autonomous completion progress
 
-Last updated: **2026-07-30T15:31:39-03:00**
+Last updated: **2026-07-30T16:05:00-03:00**
 
 This is the resumable execution ledger for C1–C7. It contains no concrete
 account IDs, ARNs, organization IDs, email addresses, or credentials.
@@ -8,14 +8,15 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
 ## Current state
 
 - Branch: `codex/awlz-autonomous-owner`
-- Active item: **C2 cost apply, then C4 and C5 remote work**
+- Active item: **C6 only — waiting on a closed Cost Explorer window**
 - AWS session: management account administrator through IAM Identity Center;
   home region `sa-east-1`; validated without recording identifiers.
 - Repository gates: `fmt`, `tflint`, `trivy`, Checkov and `validate` for all six
-  live stacks passed on 2026-07-30. With the staged C4, C5 and C7 work,
-  Checkov reported 465 passed, 0 failed and 66 justified skips.
-- Lab state: the PontoAntiCrack owner reported the lab released with no live
-  operation. No lab-targeted plan, apply or SCP experiment was started here.
+  live stacks pass on 2026-07-30; Checkov reports 477 passed, 0 failed and 69
+  justified skips. CI plans all six stacks green through OIDC.
+- Lab state: the C3 experiment ran and reversed inside a 5m20s window while the
+  PontoAntiCrack owner was idle with the lab released. All expected SCPs are
+  reattached and verified.
 
 ## Execution log
 
@@ -137,7 +138,7 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
   `2026-08-02T12:00:00-03:00` for the July 28–August 1 window, and only if
   Cost Explorer returns `Estimated: false`.
 
-### C4 — T5 implementation staged, not applied
+### C4 — T5 applied 2026-07-30
 
 - Added an account-local permissions boundary for each of the four member
   accounts, adoption by AwLZ-managed Config roles, and a Guard custom policy
@@ -150,10 +151,17 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
 - Terraform validation, tflint, Trivy and Checkov pass. Checkov reports 384
   passed, 0 failed and 66 justified skips; boundary false positives carry an
   individual inline reason.
-- Remote planning and apply remain pending behind C3. No boundary, Config rule
-  or SCP change has reached AWS from this staged implementation.
+- Applied together with the cost lever from one reviewed plan: 8 creates
+  (four boundary policies, four Config rules), 6 in-place updates and the 4
+  standard-subscription deletes. `terraform plan` afterwards reports no changes.
+- Verified live: four boundary policies, four `ACTIVE` Config rules, the
+  AwLZ-managed Config role carrying the boundary ARN by `iam get-role`, and all
+  five Config recorders still `recording: true` / `lastStatus: SUCCESS`.
+- The `require-permissions-boundary` SCP is written and validated but is still
+  the only guardrail not attached; it lands with the next `live/guardrails`
+  apply.
 
-### C4 — T8 implementation staged, not applied
+### C4 — T8 applied and observed firing 2026-07-30
 
 - Added an exact-ARN CloudTrail metric filter for all four
   `OrganizationAccountAccessRole` roles, a one-minute CloudWatch alarm and an
@@ -162,11 +170,17 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
   notification-channel ownership.
 - Terraform validation, tflint, Trivy and Checkov pass; Checkov reports 397
   passed, 0 failed and 66 justified skips.
-- Remote plan, apply, harmless observed role assumption and `ALARM` transition
-  remain pending. No logging resource has changed in AWS from this staged
-  implementation.
+- The first apply failed halfway: SNS rejects `sns:*` in a topic policy with
+  "Policy statement action out of service scope" and fails the whole
+  `SetTopicAttributes` call, so the topic existed without a policy and the alarm
+  was never created. The owner statement now names the eight topic-scoped
+  actions; the follow-up plan was 2 creates and applied cleanly.
+- The alarm was proved by real events rather than a synthetic metric: this
+  session's own verification work assumed the recovery role repeatedly. The
+  metric recorded 15 assumptions in one five-minute bucket and the alarm moved
+  to `ALARM` on a datapoint of 2.
 
-### C5 — read-only member plan roles staged, not applied
+### C5 — read-only member plan roles applied 2026-07-30
 
 - Added one `awlz-gha-plan-readonly` role per member account. Trust is limited
   to the exact management OIDC plan role; each role has AWS `ReadOnlyAccess`
@@ -174,9 +188,15 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
 - The management plan role can assume only the four computed member role ARNs.
   Logging, detection and CI provider role names now default to break-glass for
   local apply and accept the read-only role name for CI.
-- `live/ci-oidc` is temporarily removed from this branch's plan matrix because
-  it cannot assume roles that do not exist yet. Main is unaffected. It must
-  return with logging and detection before merge.
+- Applied: 8 creates and one in-place policy update adding `sts:AssumeRole`
+  limited to the four computed member role ARNs. State-write denies are intact.
+- `live/logging`, `live/detection` and `live/ci-oidc` are back in the CI plan
+  matrix. Run 30571919250 planned all six stacks green through OIDC with
+  `TF_VAR_member_role_name: awlz-gha-plan-readonly`, so CI no longer needs
+  administrator in any account.
+- IAM policy simulation of the new role returns `allowed` for
+  `config:DescribeConfigurationRecorders` and `explicitDeny` for
+  `config:PutConfigurationRecorder`.
 - Terraform validation, tflint, Trivy and Checkov pass; Checkov reports 465
   passed, 0 failed and 66 justified skips.
 - Remote plan/apply and real OIDC plan proof remain pending.
@@ -192,20 +212,26 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
   extracts a frame for pixel inspection.
 - WSL dependencies: asciinema 2.4.0 and Pillow from Ubuntu packages; official
   `agg` 1.9.0 release verified against its published SHA-256 before install.
-- Recording remains pending on the applied C5 simulation evidence. No
-  placeholder cast or GIF will be committed.
+- Recorded once C5 was applied and the simulation was real. The committed cast
+  and GIF come from that run; no placeholder was ever committed.
+- The first render opened with a six-second blank frame because the only idle in
+  the cast is the shell warm-up and the render idle limit was 5s. Lowered to 1s,
+  which keeps pacing in the render instead of padding the recording.
+- Audited: the deny-pattern self-test passes against a known fake ARN, the cast
+  contains no forbidden pattern, and both rendered frames were inspected as
+  pixels. No account ID, ARN, organization ID, email or SSO URL appears.
 
 ## Roadmap
 
 | Item | State | Proof required |
 |---|---|---|
 | C1 — GuardDuty | **Proved** | Four delegated members with `RelationshipStatus: Enabled` |
-| C2 — Security Hub cost decision | **Decided; apply next** | USD 24.77 five-account vs USD 13.73 security-only joint projection |
+| C2 — Security Hub cost decision | **Applied** | USD 24.77 five-account vs USD 13.73 security-only joint projection |
 | C3 — CIS control experiment | **Proved** | Lab measured with and without SCPs, probes flipped both ways, reattachment verified independently and by plan |
-| C4 — T5 and T8 | Pending | Applied boundary adoption, Config detection, observed CloudTrail event and alarm |
-| C5 — CI least privilege | Pending | Member read-only roles and successful OIDC plans without write permissions |
+| C4 — T5 and T8 | **Proved** | Boundary adopted in four accounts, Config rules `ACTIVE`, alarm moved to `ALARM` on real recovery-role assumptions |
+| C5 — CI least privilege | **Proved** | Member read-only roles applied; all six stacks planned green in CI through OIDC with no administrator |
 | C6 — cost actuals | **Time-bound** | Earliest retry 2026-08-02T12:00:00-03:00; require `Estimated: false` |
-| C7 — demo | Pending | Audited raw cast and rendered GIF showing one deny and one allowed read |
+| C7 — demo | **Proved** | `docs/img/awlz-ci-readonly.cast` and `.gif`, audited as text and inspected as pixels |
 
 ## Recovery invariants
 

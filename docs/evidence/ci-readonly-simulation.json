@@ -1,0 +1,13 @@
+{
+  "schema": "awlz-ci-readonly-simulation/v1",
+  "evaluations": [
+    {
+      "action": "config:DescribeConfigurationRecorders",
+      "decision": "allowed"
+    },
+    {
+      "action": "config:PutConfigurationRecorder",
+      "decision": "explicitDeny"
+    }
+  ]
+}

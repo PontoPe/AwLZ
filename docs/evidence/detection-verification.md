@@ -124,3 +124,56 @@ in all five accounts and USD 13.73 with CIS retained only in the delegated
 security account. All five subscriptions stay live until this experiment is
 valid; the cheaper configuration is applied immediately afterwards. See
 `docs/cost.md` for the arithmetic, measurement timestamps and evidence loss.
+
+## T5, T8 and least-privilege CI — applied 2026-07-30
+
+### T5 — permissions boundary and its detector
+
+| Check | Result |
+|---|---|
+| `awlz-permissions-boundary` policy per member account | 4 of 4 |
+| `awlz-role-permissions-boundary` Config rule per member account | 4 of 4 `ACTIVE` |
+| AwLZ-managed Config role carries the boundary ARN | verified by `iam get-role` |
+| Config recorder still delivering after the boundary attached | `recording: true`, `lastStatus: SUCCESS` in all five accounts |
+
+`iam list-roles` does not return `PermissionsBoundary`; adoption has to be read
+with `get-role` per role. A boundary that silently failed to attach would
+otherwise look identical to one that worked.
+
+### T8 — break-glass alarm, proved by a real event
+
+The alarm was not tested with a synthetic metric. Every verification step in
+this session assumed `OrganizationAccountAccessRole` in member accounts, which
+is exactly the event the metric filter matches.
+
+```text
+Metric:  awlz/Security  BreakGlassAssumeRole
+Sample:  15 assumptions in the 15:40-03:00 five-minute bucket
+Alarm:   ALARM — "1 datapoint [2.0 (30/07/26 18:43:00)] was greater than or
+         equal to the threshold (1.0)"
+```
+
+The path is end to end: CloudTrail organization trail, CloudWatch Logs metric
+filter on the four exact recovery-role ARNs, one-minute alarm, and an SNS topic
+encrypted with a dedicated CMK whose policy admits only CloudWatch, only from
+this account, only for this alarm ARN.
+
+### C5 — CI plans without administrator anywhere
+
+`awlz-gha-plan-readonly` now exists in each member account: it trusts only the
+management plan role, holds `ReadOnlyAccess` and carries the T5 boundary. The
+management plan role may assume those four role ARNs and nothing else.
+
+IAM policy simulation of that role, recorded in
+`docs/evidence/ci-readonly-simulation.json`:
+
+| Action | Decision |
+|---|---|
+| `config:DescribeConfigurationRecorders` | `allowed` |
+| `config:PutConfigurationRecorder` | `explicitDeny` |
+
+`live/logging`, `live/detection` and `live/ci-oidc` are back in the CI plan
+matrix, and [run 30571919250](https://github.com/PontoPe/AwLZ/actions/runs/30571919250)
+planned all six stacks green through OIDC with that role. Before C5 those three
+stacks could only be planned by assuming administrator, which is why they were
+excluded rather than quietly planned.
