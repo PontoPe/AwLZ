@@ -17,6 +17,15 @@ resource "aws_guardduty_organization_admin_account" "this" {
   admin_account_id = var.security_account_id
 }
 
+# GuardDuty treats the Organizations management account as a special member:
+# CreateMembers cannot enable its detector. The detector must already exist
+# before the delegated administrator can associate that account.
+resource "aws_guardduty_detector" "management" {
+  # checkov:skip=CKV2_AWS_3:The management detector is enrolled under the delegated security detector; only the administrator detector owns organization configuration. C1 proves the association.
+  enable                       = true
+  finding_publishing_frequency = var.guardduty_finding_frequency
+}
+
 resource "aws_securityhub_organization_admin_account" "this" {
   admin_account_id = var.security_account_id
 
@@ -393,8 +402,9 @@ data "aws_iam_policy_document" "config_bucket" {
 resource "aws_iam_role" "aggregator" {
   provider = aws.security
 
-  name               = "${var.project}-config-aggregator"
-  assume_role_policy = data.aws_iam_policy_document.aggregator_assume.json
+  name                 = "${var.project}-config-aggregator"
+  assume_role_policy   = data.aws_iam_policy_document.aggregator_assume.json
+  permissions_boundary = var.security_permissions_boundary_arn
 }
 
 data "aws_iam_policy_document" "aggregator_assume" {

@@ -60,12 +60,12 @@ variable "security_standards" {
 
 variable "auto_enable_standards" {
   description = <<-EOT
-    Whether member accounts joining Security Hub get the default standards.
+    Whether future member accounts joining Security Hub get AWS's default
+    standards (FSBP and CIS v1.2.0).
 
-    "DEFAULT" is required for a per-account CIS score, which is the deliverable
-    — findings aggregate to the administrator either way, but the *score* is
-    computed per account. "NONE" is cheaper and leaves member accounts
-    unscored.
+    This does not cover existing organization accounts and does not enable the
+    CIS v3.0.0 benchmark used for this project's evidence. Existing accounts
+    and their CIS v3.0.0 subscriptions are explicit in live/detection.
   EOT
 
   type    = string
@@ -74,6 +74,16 @@ variable "auto_enable_standards" {
   validation {
     condition     = contains(["DEFAULT", "NONE"], var.auto_enable_standards)
     error_message = "auto_enable_standards must be DEFAULT or NONE."
+  }
+}
+
+variable "security_permissions_boundary_arn" {
+  description = "Account-local boundary for the Config aggregator role in the security account."
+  type        = string
+
+  validation {
+    condition     = can(regex("^arn:[^:]+:iam::[0-9]{12}:policy/[A-Za-z0-9+=,.@_/-]+$", var.security_permissions_boundary_arn))
+    error_message = "security_permissions_boundary_arn must be an IAM managed-policy ARN."
   }
 }
 

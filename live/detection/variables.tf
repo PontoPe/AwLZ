@@ -16,6 +16,17 @@ variable "profile" {
   default     = ""
 }
 
+variable "member_role_name" {
+  description = "Cross-account role used by providers: break-glass for apply, read-only for CI plan."
+  type        = string
+  default     = "OrganizationAccountAccessRole"
+
+  validation {
+    condition     = can(regex("^(OrganizationAccountAccessRole|[a-z][a-z0-9-]{2,15}-gha-plan-readonly)$", var.member_role_name))
+    error_message = "member_role_name must be OrganizationAccountAccessRole or a project-prefixed gha-plan-readonly role."
+  }
+}
+
 variable "account_id" {
   description = "Management account ID. Delegation is registered here."
   type        = string
@@ -56,9 +67,20 @@ variable "config_retention_days" {
 }
 
 variable "auto_enable_standards" {
-  description = "DEFAULT gives member accounts a CIS score of their own; NONE is cheaper and leaves them unscored."
+  description = "Whether future accounts get AWS's default FSBP and CIS v1.2.0 standards. Existing accounts use explicit CIS v3.0.0 subscriptions."
   type        = string
   default     = "DEFAULT"
+}
+
+# The cost lever, not a feature flag. Five CIS subscriptions project USD 24.77
+# jointly with PontoAntiCrack against a USD 20 ceiling; one projects USD 13.73.
+# The C3 control experiment needed all five and has been captured, so the four
+# member subscriptions come off. Membership, findings aggregation, Config,
+# GuardDuty and the SCPs are unaffected — see docs/cost.md.
+variable "member_standards_enabled" {
+  description = "Subscribe the four member accounts to CIS v3.0.0 in addition to the delegated administrator. Costs roughly USD 11/month."
+  type        = bool
+  default     = false
 }
 
 locals {

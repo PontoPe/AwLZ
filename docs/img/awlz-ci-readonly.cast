@@ -1,0 +1,4 @@
+{"version": 2, "width": 88, "height": 18, "timestamp": 1785437315, "env": {"SHELL": "/bin/bash", "TERM": "xterm-256color"}, "title": "AwLZ guardrail denial"}
+[0.018718, "o", "\u001b[1mAwLZ — least-privilege CI plan\u001b[0m\r\n\r\n\u001b[2m# Replaying sanitized evidence from AWS IAM policy simulation\u001b[0m\r\n\u001b[2m# No credential, account ID, ARN or live write is used by this demo.\u001b[0m\r\n\r\n"]
+[0.051836, "o", "\u001b[1m$ evaluate config:DescribeConfigurationRecorders\u001b[0m\r\n\u001b[32mALLOWED\u001b[0m  read-only configuration discovery\r\n\r\n\u001b[1m$ evaluate config:PutConfigurationRecorder\u001b[0m\r\n"]
+[0.052003, "o", "\u001b[31mDENIED\u001b[0m   write path blocked by the member role boundary\r\n\r\n\u001b[1mResult: plan can refresh real state; it cannot reconfigure detection.\u001b[0m\r\n"]

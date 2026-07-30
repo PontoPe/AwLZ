@@ -11,9 +11,8 @@ provider "aws" {
 
 # The archive bucket lives in a different account. There are no static
 # credentials anywhere in this repo, so the second provider gets there by
-# assuming the role Organizations creates in every member account — the same
-# role that is the break-glass path, and the one protect-guardrail-roles
-# defends against deletion.
+# assuming a named member role. Local apply uses the Organizations break-glass
+# role; CI overrides the name with the dedicated read-only plan role.
 provider "aws" {
   alias   = "log_archive"
   region  = var.region
@@ -22,7 +21,7 @@ provider "aws" {
   allowed_account_ids = [var.log_archive_account_id]
 
   assume_role {
-    role_arn     = "arn:aws:iam::${var.log_archive_account_id}:role/OrganizationAccountAccessRole"
+    role_arn     = "arn:aws:iam::${var.log_archive_account_id}:role/${var.member_role_name}"
     session_name = "${var.project}-logging"
   }
 

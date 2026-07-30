@@ -1,3 +1,31 @@
+module "boundary_security" {
+  source = "../../modules/permission-boundary"
+
+  providers = { aws = aws.security }
+  project   = var.project
+}
+
+module "boundary_log_archive" {
+  source = "../../modules/permission-boundary"
+
+  providers = { aws = aws.log_archive }
+  project   = var.project
+}
+
+module "boundary_dev" {
+  source = "../../modules/permission-boundary"
+
+  providers = { aws = aws.dev }
+  project   = var.project
+}
+
+module "boundary_lab" {
+  source = "../../modules/permission-boundary"
+
+  providers = { aws = aws.lab }
+  project   = var.project
+}
+
 module "detection" {
   source = "../../modules/detection"
 
@@ -7,14 +35,104 @@ module "detection" {
     aws.log_archive = aws.log_archive
   }
 
-  project                = var.project
-  region                 = var.region
-  security_account_id    = var.account_ids.security
-  log_archive_account_id = var.account_ids.log-archive
-  organization_id        = var.organization_id
-  recording_account_ids  = concat([var.account_id], values(var.account_ids))
-  config_retention_days  = var.config_retention_days
-  auto_enable_standards  = var.auto_enable_standards
+  project                           = var.project
+  region                            = var.region
+  security_account_id               = var.account_ids.security
+  log_archive_account_id            = var.account_ids.log-archive
+  organization_id                   = var.organization_id
+  recording_account_ids             = concat([var.account_id], values(var.account_ids))
+  config_retention_days             = var.config_retention_days
+  auto_enable_standards             = var.auto_enable_standards
+  security_permissions_boundary_arn = module.boundary_security.arn
+}
+
+# Local Security Hub organization configuration auto-enables only accounts that
+# join after it is configured. These four accounts already existed, so their
+# enablement, membership and CIS subscription are explicit Terraform resources.
+#
+# Default standards stay off here. The portfolio evidence is CIS v3.0.0; also
+# enabling FSBP and CIS v1.2.0 would add checks, cost and a second denominator
+# without strengthening the benchmark this project claims.
+resource "aws_securityhub_account" "management" {
+  enable_default_standards = false
+}
+
+resource "aws_securityhub_account" "log_archive" {
+  provider = aws.log_archive
+
+  enable_default_standards = false
+}
+
+resource "aws_securityhub_account" "dev" {
+  provider = aws.dev
+
+  enable_default_standards = false
+}
+
+resource "aws_securityhub_account" "lab" {
+  provider = aws.lab
+
+  enable_default_standards = false
+}
+
+resource "aws_securityhub_member" "existing" {
+  provider = aws.security
+
+  for_each = {
+    management  = var.account_id
+    log_archive = var.account_ids.log-archive
+    dev         = var.account_ids.dev
+    lab         = var.account_ids.lab
+  }
+
+  account_id = each.value
+  invite     = false
+
+  depends_on = [
+    module.detection,
+    aws_securityhub_account.management,
+    aws_securityhub_account.log_archive,
+    aws_securityhub_account.dev,
+    aws_securityhub_account.lab,
+  ]
+}
+
+resource "aws_securityhub_standards_subscription" "management" {
+  for_each = var.member_standards_enabled ? module.detection.security_hub_standards : {}
+
+  standards_arn = each.value
+
+  depends_on = [aws_securityhub_member.existing]
+}
+
+resource "aws_securityhub_standards_subscription" "log_archive" {
+  provider = aws.log_archive
+
+  for_each = var.member_standards_enabled ? module.detection.security_hub_standards : {}
+
+  standards_arn = each.value
+
+  depends_on = [aws_securityhub_member.existing]
+}
+
+resource "aws_securityhub_standards_subscription" "dev" {
+  provider = aws.dev
+
+  for_each = var.member_standards_enabled ? module.detection.security_hub_standards : {}
+
+  standards_arn = each.value
+
+  depends_on = [aws_securityhub_member.existing]
+}
+
+resource "aws_securityhub_standards_subscription" "lab" {
+  provider = aws.lab
+
+  for_each = var.member_standards_enabled ? module.detection.security_hub_standards : {}
+
+  standards_arn = each.value
+
+  depends_on = [aws_securityhub_member.existing]
 }
 
 # One recorder per account. Terraform cannot iterate over providers, so these
@@ -37,9 +155,10 @@ module "config_security" {
 
   providers = { aws = aws.security }
 
-  project              = var.project
-  delivery_bucket_name = module.detection.config_bucket_name
-  delivery_kms_key_arn = module.detection.config_kms_key_arn
+  project                  = var.project
+  delivery_bucket_name     = module.detection.config_bucket_name
+  delivery_kms_key_arn     = module.detection.config_kms_key_arn
+  permissions_boundary_arn = module.boundary_security.arn
 }
 
 module "config_log_archive" {
@@ -47,9 +166,10 @@ module "config_log_archive" {
 
   providers = { aws = aws.log_archive }
 
-  project              = var.project
-  delivery_bucket_name = module.detection.config_bucket_name
-  delivery_kms_key_arn = module.detection.config_kms_key_arn
+  project                  = var.project
+  delivery_bucket_name     = module.detection.config_bucket_name
+  delivery_kms_key_arn     = module.detection.config_kms_key_arn
+  permissions_boundary_arn = module.boundary_log_archive.arn
 }
 
 module "config_dev" {
@@ -57,9 +177,10 @@ module "config_dev" {
 
   providers = { aws = aws.dev }
 
-  project              = var.project
-  delivery_bucket_name = module.detection.config_bucket_name
-  delivery_kms_key_arn = module.detection.config_kms_key_arn
+  project                  = var.project
+  delivery_bucket_name     = module.detection.config_bucket_name
+  delivery_kms_key_arn     = module.detection.config_kms_key_arn
+  permissions_boundary_arn = module.boundary_dev.arn
 }
 
 module "config_lab" {
@@ -67,9 +188,57 @@ module "config_lab" {
 
   providers = { aws = aws.lab }
 
-  project              = var.project
-  delivery_bucket_name = module.detection.config_bucket_name
-  delivery_kms_key_arn = module.detection.config_kms_key_arn
+  project                  = var.project
+  delivery_bucket_name     = module.detection.config_bucket_name
+  delivery_kms_key_arn     = module.detection.config_kms_key_arn
+  permissions_boundary_arn = module.boundary_lab.arn
+}
+
+# The boundary policy is preventive; these rules are the independent detective
+# control. Service-linked roles and the Organizations-created break-glass role
+# cannot adopt this boundary and are explicitly excluded in the Guard policy.
+module "boundary_rule_security" {
+  source = "../../modules/boundary-config-rule"
+
+  providers = { aws = aws.security }
+
+  project               = var.project
+  required_boundary_arn = module.boundary_security.arn
+
+  depends_on = [module.config_security]
+}
+
+module "boundary_rule_log_archive" {
+  source = "../../modules/boundary-config-rule"
+
+  providers = { aws = aws.log_archive }
+
+  project               = var.project
+  required_boundary_arn = module.boundary_log_archive.arn
+
+  depends_on = [module.config_log_archive]
+}
+
+module "boundary_rule_dev" {
+  source = "../../modules/boundary-config-rule"
+
+  providers = { aws = aws.dev }
+
+  project               = var.project
+  required_boundary_arn = module.boundary_dev.arn
+
+  depends_on = [module.config_dev]
+}
+
+module "boundary_rule_lab" {
+  source = "../../modules/boundary-config-rule"
+
+  providers = { aws = aws.lab }
+
+  project               = var.project
+  required_boundary_arn = module.boundary_lab.arn
+
+  depends_on = [module.config_lab]
 }
 
 # Each recorder reports the account it actually landed in. If a provider is

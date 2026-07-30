@@ -34,7 +34,26 @@ Denies IAM writes against `${project}-*` roles and `OrganizationAccountAccessRol
 
 Identity Center's `aws-reserved/sso.amazonaws.com/*` roles are **not** in scope here. Denying IAM writes on them would break permission-set provisioning, which reprovisions those roles on every change. Protecting them needs a condition that exempts the Identity Center service principal — worth doing, not done yet.
 
-Covers **T5**, partially. Residual risk stays until the permission boundary and its Config rule exist.
+Covers **T5**, together with the boundary enforcement below.
+
+### `require-permissions-boundary.json`
+
+Requires every newly created customer role to carry the account-local
+`${project}-permissions-boundary`. It also prevents non-break-glass principals
+from removing that boundary, replacing it with another policy, or changing the
+approved policy document.
+
+`OrganizationAccountAccessRole` is the sole exception. It is the recovery path
+if a boundary is wrong, is independently protected by
+`protect-guardrail-roles`, and every use is recorded and alarmed. Service-linked
+roles use the separate `CreateServiceLinkedRole` API and are unaffected.
+
+The boundary caps identity and Organizations escalation, audit/detection
+tampering and KMS key destruction. A per-account Config rule independently
+flags customer roles that do not carry it; grandfathered workload roles remain
+visible rather than being silently mutated across Terraform state ownership.
+
+Covers **T5**.
 
 ## Why there is no blanket root-deny policy
 

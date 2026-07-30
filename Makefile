@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 TF_DIRS := $(shell find live modules -name '*.tf' -exec dirname {} \; 2>/dev/null | sort -u)
 
-.PHONY: help bootstrap fmt lint sec plan apply evidence cost clean
+.PHONY: help bootstrap fmt lint sec plan apply evidence cost demo demo-record clean
 
 help: ## show targets
 	@grep -hE '^[a-z-]+:.*##' $(MAKEFILE_LIST) | sed 's/:.*##/\t/' | column -t -s $$'\t'
@@ -30,6 +30,12 @@ evidence: ## export Security Hub CIS score to docs/evidence/
 
 cost: ## estimate monthly cost
 	infracost breakdown --path .
+
+demo: ## replay the sanitized C5 allow/deny evidence locally
+	./scripts/demo.sh
+
+demo-record: ## record, audit and render the deterministic demo in WSL/Linux
+	./scripts/demo-record.sh
 
 clean:
 	find . -name '.terraform' -type d -prune -exec rm -rf {} + ; find . -name 'tfplan' -delete

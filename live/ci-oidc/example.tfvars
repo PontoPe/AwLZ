@@ -8,6 +8,13 @@ profile = "mgmt"
 
 account_id = "000000000000"
 
+account_ids = {
+  log-archive = "000000000000"
+  security    = "000000000000"
+  dev         = "000000000000"
+  lab         = "000000000000"
+}
+
 github_repository = "PontoPe/AwLZ"
 apply_environment = "production"
 

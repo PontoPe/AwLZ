@@ -1,6 +1,7 @@
 # Detection verification
 
-Stack: `live/detection`. Date: 2026-07-28, within an hour of apply.
+Stack: `live/detection`. Initial verification: 2026-07-28, within an hour of
+apply. GuardDuty membership reverified: 2026-07-30T13:47:05-03:00.
 
 Account IDs redacted. Delegated administrator is `awlz-security`.
 
@@ -15,6 +16,7 @@ Account IDs redacted. Delegated administrator is `awlz-security`.
 | Config recorder — lab | same | `recording: true`, `SUCCESS` |
 | Config aggregator | created in `awlz-security` | org-wide, all regions |
 | GuardDuty | `describe-organization-configuration` | `AutoEnableOrganizationMembers: ALL` |
+| GuardDuty members | delegated `list-members --only-associated` | four of four `Enabled` |
 | Security Hub | `get-enabled-standards` | CIS v3.0.0 subscribed |
 | Access Analyzer | ORGANIZATION-scope analyzer | created in `awlz-security` |
 | Provider placement | `check` block on five recorder account IDs | five distinct accounts |
@@ -23,19 +25,82 @@ Account IDs redacted. Delegated administrator is `awlz-security`.
 
 That path had three separate defects before it worked. They are recorded in `live/detection/README.md` rather than here, because they are properties of the code, not of the deployment.
 
-## Not yet verified — pending, not passing
+## GuardDuty membership — closed 2026-07-30
 
-Both of these are time-dependent. Recording them as open rather than waiting and backfilling a claim.
+The delegated detector initially listed three enabled members: log archive, dev
+and lab. The management account was the only missing organization account even
+though auto-enable was `ALL`.
 
-**GuardDuty member enrollment.** `list-members` returns empty. `AutoEnableOrganizationMembers` is `ALL`, which covers existing accounts as well as future ones, but enrollment is asynchronous and had not completed at the time of writing. Re-check:
+The management account had no regional detector. This is a GuardDuty special
+case: the delegated administrator cannot enable that detector through
+`CreateMembers`; it must already exist before association. The detector is now
+Terraform-managed. After applying the reviewed one-resource plan, an
+idempotent `CreateMembers` call was made only for the still-missing management
+account.
 
-```bash
-aws guardduty list-members --detector-id <id> --region sa-east-1
+Sanitized delegated-administrator query:
+
+```text
+Timestamp: 2026-07-30T13:47:05-03:00
+Query: list-members --only-associated
+AutoEnableOrganizationMembers: ALL
+management: Enabled
+log-archive: Enabled
+dev: Enabled
+lab: Enabled
+UnexpectedMembers: 0
 ```
 
-Four members expected, `RelationshipStatus: Enabled`. If they are still absent after a few hours, existing accounts may need explicit `create-members` — auto-enable is documented to cover them, so that would be worth confirming before writing it up.
+Independent reverse check from the management account:
 
-**CIS score.** `StandardsStatus` is `INCOMPLETE` and `get-findings` returns zero. Security Hub provisions controls over roughly 24 hours and evaluates against Config data that does not exist yet — the recorders started minutes ago. A score captured now would read as 0% and mean nothing.
+```text
+ManagementDetectorCount: 1
+AdministratorMatchesSecurity: PASS
+ManagementRelationshipStatus: Enabled
+DelegatedMembersEnabled: 4/4
+PostApplyTerraformPlan: NO_CHANGES
+```
+
+The management exception and `CreateMembers` behavior are documented in the
+[GuardDuty API reference](https://docs.aws.amazon.com/guardduty/latest/APIReference/API_CreateMembers.html).
+
+## Security Hub existing-account enrollment
+
+Organization auto-enable did not retroactively enroll the four accounts that
+already existed. Terraform now enables Security Hub with default standards off
+in management, log archive, dev and lab, associates those accounts to the
+delegated administrator, and explicitly subscribes each of the five accounts
+to CIS v3.0.0.
+
+The first reviewed apply completed the four account enablements and three
+member associations, then stopped because the new management subscription had
+not yet propagated to the delegated administrator. No standard subscription
+or SCP changed in that failed request. Independent checks found the management
+hub enabled, three members `Enabled`, and management as the only missing
+member. A second saved plan contained exactly that membership and the four
+missing CIS subscriptions; it applied 5 added, 0 changed and 0 destroyed.
+
+Sanitized post-recovery state:
+
+```text
+management: CIS v3.0.0 READY, controls READY_FOR_UPDATES
+security: CIS v3.0.0 READY, controls READY_FOR_UPDATES
+log-archive: CIS v3.0.0 READY, controls READY_FOR_UPDATES
+dev: CIS v3.0.0 READY, controls READY_FOR_UPDATES
+lab: CIS v3.0.0 READY, controls READY_FOR_UPDATES
+Unexpected standard subscriptions: 0
+```
+
+## Not yet verified — pending, not passing
+
+The CIS score is time-dependent. Recording it as open rather than backfilling a
+claim.
+
+At `2026-07-30T14:11:12-03:00`, every subscription was ready, but the four
+accounts enabled today had evaluated only 17–20 of 36 enabled controls. The
+older security account had evaluated 35. The partial scores are deliberately
+excluded from the baseline. The experiment starts only after the denominator
+is stable and the exact query, timestamp and denominator are recorded.
 
 ## The baseline problem
 
@@ -54,4 +119,61 @@ The README has been corrected to describe this rather than the original promise.
 
 ## Cost note
 
-This stack is the entire recurring bill. Security Hub with `auto_enable_standards = "DEFAULT"` is projected at USD 4–18/month against a USD 20 budget — the single largest line and the one most likely to force a decision. See `docs/cost.md` for the arithmetic and the one-line lever that reduces it.
+The measured-input conservative joint projection is USD 24.77/month with CIS
+in all five accounts and USD 13.73 with CIS retained only in the delegated
+security account. All five subscriptions stay live until this experiment is
+valid; the cheaper configuration is applied immediately afterwards. See
+`docs/cost.md` for the arithmetic, measurement timestamps and evidence loss.
+
+## T5, T8 and least-privilege CI — applied 2026-07-30
+
+### T5 — permissions boundary and its detector
+
+| Check | Result |
+|---|---|
+| `awlz-permissions-boundary` policy per member account | 4 of 4 |
+| `awlz-role-permissions-boundary` Config rule per member account | 4 of 4 `ACTIVE` |
+| AwLZ-managed Config role carries the boundary ARN | verified by `iam get-role` |
+| Config recorder still delivering after the boundary attached | `recording: true`, `lastStatus: SUCCESS` in all five accounts |
+
+`iam list-roles` does not return `PermissionsBoundary`; adoption has to be read
+with `get-role` per role. A boundary that silently failed to attach would
+otherwise look identical to one that worked.
+
+### T8 — break-glass alarm, proved by a real event
+
+The alarm was not tested with a synthetic metric. Every verification step in
+this session assumed `OrganizationAccountAccessRole` in member accounts, which
+is exactly the event the metric filter matches.
+
+```text
+Metric:  awlz/Security  BreakGlassAssumeRole
+Sample:  15 assumptions in the 15:40-03:00 five-minute bucket
+Alarm:   ALARM — "1 datapoint [2.0 (30/07/26 18:43:00)] was greater than or
+         equal to the threshold (1.0)"
+```
+
+The path is end to end: CloudTrail organization trail, CloudWatch Logs metric
+filter on the four exact recovery-role ARNs, one-minute alarm, and an SNS topic
+encrypted with a dedicated CMK whose policy admits only CloudWatch, only from
+this account, only for this alarm ARN.
+
+### C5 — CI plans without administrator anywhere
+
+`awlz-gha-plan-readonly` now exists in each member account: it trusts only the
+management plan role, holds `ReadOnlyAccess` and carries the T5 boundary. The
+management plan role may assume those four role ARNs and nothing else.
+
+IAM policy simulation of that role, recorded in
+`docs/evidence/ci-readonly-simulation.json`:
+
+| Action | Decision |
+|---|---|
+| `config:DescribeConfigurationRecorders` | `allowed` |
+| `config:PutConfigurationRecorder` | `explicitDeny` |
+
+`live/logging`, `live/detection` and `live/ci-oidc` are back in the CI plan
+matrix, and [run 30571919250](https://github.com/PontoPe/AwLZ/actions/runs/30571919250)
+planned all six stacks green through OIDC with that role. Before C5 those three
+stacks could only be planned by assuming administrator, which is why they were
+excluded rather than quietly planned.

@@ -28,3 +28,23 @@ output "config_recorder_accounts" {
     lab         = module.config_lab.account_id
   }
 }
+
+output "permissions_boundary_names" {
+  description = "Member account name to permissions boundary policy name."
+  value = {
+    security    = module.boundary_security.name
+    log-archive = module.boundary_log_archive.name
+    dev         = module.boundary_dev.name
+    lab         = module.boundary_lab.name
+  }
+}
+
+output "boundary_config_rule_names" {
+  description = "Member account name to T5 Config rule name."
+  value = {
+    security    = module.boundary_rule_security.name
+    log-archive = module.boundary_rule_log_archive.name
+    dev         = module.boundary_rule_dev.name
+    lab         = module.boundary_rule_lab.name
+  }
+}

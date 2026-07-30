@@ -100,3 +100,19 @@ variable "data_event_bucket_arns" {
   type    = list(string)
   default = []
 }
+
+variable "break_glass_role_arns" {
+  description = "Exact member-account OrganizationAccountAccessRole ARNs whose use raises the T8 alarm."
+  type        = list(string)
+
+  validation {
+    condition = (
+      length(var.break_glass_role_arns) > 0 &&
+      alltrue([
+        for arn in var.break_glass_role_arns :
+        can(regex("^arn:[^:]+:iam::[0-9]{12}:role/OrganizationAccountAccessRole$", arn))
+      ])
+    )
+    error_message = "break_glass_role_arns must contain exact OrganizationAccountAccessRole ARNs."
+  }
+}

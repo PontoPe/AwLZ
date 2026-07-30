@@ -126,11 +126,43 @@ Each decision: context, options, choice, consequence. Short. Append, never rewri
 - **Decision:** AdministratorAccess, with the control placed entirely on the trust policy.
 - **Consequences:** An accurate least-privilege policy for a role that manages the organization is administrator with extra steps and a false sense of containment — and it fails open as new services are added, at the worst moment. The real boundary is the `sub` claim: only a workflow that has passed the `production` GitHub Environment can assume it. The plan role, which runs on unreviewed pull requests, is read-only and explicitly denied state writes. Sessions cap at one hour and every action lands in the org trail.
 
+### ADR-016 — Existing Security Hub accounts are explicit
+
+- **Status:** accepted
+- **Context:** Local organization auto-enable applies only to accounts that join after it is configured. All four member accounts predated `live/detection`, so only the delegated security account had Security Hub and CIS v3.0.0; configuration was present but the claimed organization evidence was not.
+- **Options:** Keep local configuration and create the existing memberships explicitly; migrate to central configuration; rely on out-of-band `CreateMembers`.
+- **Decision:** Terraform enables Security Hub without default standards in management, log archive, dev and lab, associates those four with `awlz-security`, and subscribes all five accounts explicitly to CIS v3.0.0. Keep local configuration for future accounts until cost evidence justifies a separate change.
+- **Consequences:** The benchmark has one named version and a reproducible per-account denominator. FSBP and CIS v1.2.0 are not silently added to existing accounts. The root module has repeated resources because provider aliases cannot be iterated. Future-account defaults remain a separate cost decision; a new account is not considered covered by CIS v3.0.0 until Terraform adds its provider and explicit subscription.
+
+### ADR-017 — Permission boundaries are preventive and independently detected
+
+- **Status:** accepted; deployment proof pending
+- **Context:** Protecting only the `awlz-*` role name does not stop a member account from creating a differently named role with broader permissions. Existing roles are owned by more than one Terraform state, so silently adopting or mutating all of them here would create cross-repository drift.
+- **Options:** Rename-only SCP protection; mutate every existing role; require a stable account-local boundary for new roles and detect grandfathered drift.
+- **Decision:** Create the same `awlz-permissions-boundary` in each member account. An SCP requires it on `CreateRole`, prevents non-break-glass principals from removing or replacing it, and protects the policy document. A Guard-based Config rule compares the exact account-local ARN on every customer-managed role. Service-linked, Identity Center and `OrganizationAccountAccessRole` roles are explicit exceptions.
+- **Consequences:** New workload roles cannot exceed the boundary even if an identity policy is later widened. Existing PontoAntiCrack roles stay under their owning state and are reported as noncompliant evidence instead of being changed here. `OrganizationAccountAccessRole` remains the audited recovery path if a boundary is defective; T5 is not marked closed until the plan is applied and both compliant and noncompliant evaluations are observed.
+
+### ADR-018 — Break-glass use is matched against exact role ARNs
+
+- **Status:** accepted; deployment proof pending
+- **Context:** T8 depends on `OrganizationAccountAccessRole` remaining available for recovery, but that power must not be silent. Matching only a role-name fragment would let unrelated request data create false alarms.
+- **Options:** CloudTrail Lake query after an incident; EventBridge rule; CloudWatch Logs metric filter and alarm on the existing organization-trail tail.
+- **Decision:** Build exact role ARNs from the four validated member account IDs, match `sts:AssumeRole` plus `requestParameters.roleArn`, emit one custom metric, and alarm into an encrypted SNS topic. No email endpoint is hardcoded; subscriptions are an external notification concern.
+- **Consequences:** Every break-glass assumption can be observed within the one-minute alarm period without adding another log pipeline. The topic policy accepts alarm publication only from the management account and exact alarm ARN. T8 is not marked closed until a harmless role assumption is present in CloudTrail and the alarm is observed in `ALARM`.
+
+### ADR-019 — Cross-account CI plans use dedicated read-only roles
+
+- **Status:** accepted; deployment proof pending
+- **Context:** `live/logging` and `live/detection` need member-account providers. Reusing `OrganizationAccountAccessRole` would let code from an unreviewed pull request assume administrator in every member account, even though the management plan role itself is read-only.
+- **Options:** Keep those stacks out of CI; let the plan role assume break-glass; create one read-only role per member account.
+- **Decision:** Create `awlz-gha-plan-readonly` in each member account, trusted only by the exact management OIDC plan role. Attach AWS `ReadOnlyAccess` under the T5 boundary. Cross-account provider role names are variables: local apply defaults to `OrganizationAccountAccessRole`; CI sets the read-only name.
+- **Consequences:** A pull-request plan can refresh logging and detection state without a write path in member accounts. The management plan role receives only four exact `sts:AssumeRole` resources. The stack that creates these roles is temporarily excluded from the branch plan matrix during bootstrap and must return, together with logging and detection, before merge. C5 is not closed until real OIDC plans pass and a write simulation is denied.
+
 ---
 
 ## Open questions
 
-- [ ] Permission boundaries for role creation in member accounts, plus the Config rule that catches drift. T5 stays partial until both exist.
+- [ ] Apply and verify ADR-017. T5 stays partial until the boundary SCP and all four Config rules are observed.
 - [ ] Identity Center roles (`aws-reserved/sso.amazonaws.com/*`) are excluded from guardrail-role protection, because denying IAM writes there breaks permission-set provisioning. Needs a condition exempting the Identity Center service principal.
 - [ ] The break-glass path — management account root to `OrganizationAccountAccessRole` — is documented and partially exercised, but has never been rehearsed end to end from a genuine Identity Center outage. T8 stays open until it is.
-- [ ] No alarm on break-glass role assumption.
+- [ ] Apply ADR-018 and observe one real break-glass event and alarm transition.

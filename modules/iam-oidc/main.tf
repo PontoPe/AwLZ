@@ -135,6 +135,13 @@ data "aws_iam_policy_document" "plan_state" {
     resources = [var.state_kms_key_arn]
   }
 
+  statement {
+    sid       = "AssumeMemberReadOnlyRoles"
+    effect    = "Allow"
+    actions   = ["sts:AssumeRole"]
+    resources = var.member_plan_role_arns
+  }
+
   # A plan run must not take the state lock. Terraform is told to skip locking
   # for plan-only runs; denying the write here means a misconfigured workflow
   # fails instead of blocking every other run until someone force-unlocks.

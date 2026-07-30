@@ -14,6 +14,10 @@ locals {
       project                   = var.project
       deployment_principal_arns = jsonencode(var.deployment_principal_arns)
     })
+
+    require-permissions-boundary = templatefile("${path.module}/../../policies/scp/require-permissions-boundary.json", {
+      project = var.project
+    })
   }
 
   # jsondecode then jsonencode does two jobs: it fails the plan on malformed
@@ -21,11 +25,18 @@ locals {
   # pretty-printed document wastes against the 5120-byte SCP limit.
   policies = { for name, doc in local.policy_documents : name => jsonencode(jsondecode(doc)) }
 
+  # The boundary policy must cover every member OU already protected by the
+  # other guardrails. Deriving the target set preserves existing private
+  # tfvars while preventing the new policy from being created unattached.
+  effective_scp_targets = merge(var.scp_targets, {
+    require-permissions-boundary = distinct(flatten(values(var.scp_targets)))
+  })
+
   # Flattened so each attachment is its own addressable resource. Detaching
   # one target is then a one-line edit, which matters when a policy is
   # blocking something it should not.
   attachments = merge([
-    for name, targets in var.scp_targets : {
+    for name, targets in local.effective_scp_targets : {
       for target in targets : "${name}/${target}" => {
         policy = name
         target = target

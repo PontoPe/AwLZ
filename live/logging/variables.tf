@@ -16,6 +16,17 @@ variable "profile" {
   default     = ""
 }
 
+variable "member_role_name" {
+  description = "Cross-account role used by providers: break-glass for apply, read-only for CI plan."
+  type        = string
+  default     = "OrganizationAccountAccessRole"
+
+  validation {
+    condition     = can(regex("^(OrganizationAccountAccessRole|[a-z][a-z0-9-]{2,15}-gha-plan-readonly)$", var.member_role_name))
+    error_message = "member_role_name must be OrganizationAccountAccessRole or a project-prefixed gha-plan-readonly role."
+  }
+}
+
 variable "account_id" {
   description = "Management account ID. The trail is created here."
   type        = string
@@ -33,6 +44,24 @@ variable "log_archive_account_id" {
   validation {
     condition     = can(regex("^[0-9]{12}$", var.log_archive_account_id))
     error_message = "log_archive_account_id must be exactly 12 digits."
+  }
+}
+
+variable "account_ids" {
+  description = "Member account short name to ID, used to build exact break-glass role ARNs."
+
+  type = object({
+    log-archive = string
+    security    = string
+    dev         = string
+    lab         = string
+  })
+
+  validation {
+    condition = alltrue([
+      for id in values(var.account_ids) : can(regex("^[0-9]{12}$", id))
+    ])
+    error_message = "every account id must be exactly 12 digits."
   }
 }
 

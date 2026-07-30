@@ -58,9 +58,26 @@ This stack is the entire recurring bill.
 | Security Hub | control evaluations per account per month |
 | KMS | one CMK for the Config bucket |
 
-`auto_enable_standards = "DEFAULT"` gives every member account its own CIS score, which is what the evidence is measured from. `"NONE"` is cheaper and leaves member accounts unscored.
+Existing accounts are enabled explicitly with only CIS v3.0.0, which gives the
+evidence one reproducible denominator. `auto_enable_standards = "DEFAULT"`
+applies only to accounts that join later and enables AWS's FSBP and CIS v1.2.0
+defaults; `"NONE"` avoids those additional checks.
 
 Config history expires after 90 days. CloudTrail is the immutable record of *who changed what*; Config snapshots are inputs to rule evaluation and lose value once superseded.
+
+## T5 — permissions boundary and drift rule
+
+Each member account gets an account-local `awlz-permissions-boundary`. It does
+not grant access: effective permissions remain the intersection of the role's
+identity policy, the boundary and the OU SCPs. The boundary explicitly caps IAM
+and Organizations escalation, audit/detection tampering and KMS key
+destruction.
+
+A Guard custom policy rule evaluates every recorded IAM role against the exact
+boundary ARN for its own account. Service-linked roles, Identity Center roles
+and `OrganizationAccountAccessRole` are excluded because they cannot safely
+adopt this customer boundary. Existing workload roles owned by another
+Terraform state are reported rather than modified.
 
 ## Verify
 
@@ -78,3 +95,12 @@ All five recorders `recording: true` / `lastStatus: SUCCESS`, GuardDuty `AutoEna
 Security Hub reports `StandardsStatus: INCOMPLETE` for a while after enabling, and GuardDuty member enrollment lags the API call. Neither is an error.
 
 Results in [docs/evidence/detection-verification.md](../../docs/evidence/detection-verification.md).
+
+### GuardDuty management-account enrollment
+
+The Organizations management account is a GuardDuty special case. The
+delegated administrator cannot enable its detector through `CreateMembers`, so
+`modules/detection` creates that detector in the management account first.
+Organization auto-enable remains `ALL`; an idempotent `CreateMembers` call is
+still required if the already-existing management account has not been
+associated automatically.

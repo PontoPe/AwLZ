@@ -64,3 +64,19 @@ variable "state_kms_key_arn" {
   description = "CMK protecting state. Reading state is impossible without it, so a role with s3 access and no kms grant fails confusingly."
   type        = string
 }
+
+variable "member_plan_role_arns" {
+  description = "Exact member-account read-only roles the management plan role may assume."
+  type        = list(string)
+
+  validation {
+    condition = (
+      length(var.member_plan_role_arns) > 0 &&
+      alltrue([
+        for arn in var.member_plan_role_arns :
+        can(regex("^arn:[^:]+:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+$", arn))
+      ])
+    )
+    error_message = "member_plan_role_arns must contain exact IAM role ARNs."
+  }
+}
