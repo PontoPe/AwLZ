@@ -361,7 +361,7 @@ data "aws_iam_policy_document" "trail_bucket" {
 
 resource "aws_cloudwatch_log_group" "trail" {
   # checkov:skip=CKV_AWS_338:One-year retention belongs on the system of record, which is the object-locked S3 archive. This is a 14-day tail for alarms and subscriptions; a second year-long copy would double the bill to defend nothing the archive does not already cover.
-  # checkov:skip=CKV_AWS_158:A dedicated CMK here would be a third key at ~USD 1/month against a hard USD 20 budget, to protect a transient copy whose durable original is already CMK-encrypted in another account. CloudWatch Logs is encrypted at rest with an AWS-owned key regardless. Revisit when the budget rises or when this group starts carrying data the archive does not — see docs/cost.md.
+  # checkov:skip=CKV_AWS_158:A dedicated CMK here would be one more key at ~USD 1/month against a hard USD 20 budget, to protect a transient copy whose durable original is already CMK-encrypted in another account. CloudWatch Logs is encrypted at rest with an AWS-owned key regardless. Revisit when the budget rises or when this group starts carrying data the archive does not — see docs/cost.md.
 
   name              = "/aws/cloudtrail/${local.trail_name}"
   retention_in_days = var.cloudwatch_retention_days
@@ -380,9 +380,79 @@ resource "aws_cloudwatch_log_metric_filter" "break_glass" {
   }
 }
 
+# A dedicated CMK, not `alias/aws/sns`.
+#
+# The AWS-managed key cannot carry a key policy, so nothing constrains which
+# principal in this account decrypts the topic, and it cannot be revoked
+# independently of SNS itself. The notification says a member account's
+# recovery role was assumed — timing and target are exactly what an attacker
+# wants to suppress or read. A dedicated key adds ~USD 1/month and buys a
+# revocation switch plus a source-bound grant; see docs/cost.md.
+resource "aws_kms_key" "break_glass" {
+  description             = "Encrypts the ${var.project} break-glass alarm topic"
+  enable_key_rotation     = true
+  deletion_window_in_days = 30
+  policy                  = data.aws_iam_policy_document.break_glass_key.json
+}
+
+resource "aws_kms_alias" "break_glass" {
+  name          = "alias/${var.project}-break-glass-alarm"
+  target_key_id = aws_kms_key.break_glass.key_id
+}
+
+data "aws_iam_policy_document" "break_glass_key" {
+  # checkov:skip=CKV_AWS_109:A KMS key policy must delegate to the account root or the key is orphaned. Mandatory per AWS.
+  # checkov:skip=CKV_AWS_111:Same statement — delegation to the owning account, not a grant to a principal.
+  # checkov:skip=CKV_AWS_356:A key policy's resource is always the key it is attached to.
+
+  statement {
+    sid     = "AllowAccountAdministration"
+    effect  = "Allow"
+    actions = ["kms:*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.mgmt.account_id}:root"]
+    }
+
+    resources = ["*"]
+  }
+
+  # CloudWatch encrypts the alarm notification under this key before SNS
+  # stores it. Same binding as the topic policy: this account, this alarm.
+  statement {
+    sid    = "AllowCloudWatchAlarmEncryption"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudwatch.amazonaws.com"]
+    }
+
+    actions = [
+      "kms:GenerateDataKey*",
+      "kms:Decrypt",
+    ]
+
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.mgmt.account_id]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = [local.break_glass_alarm_arn]
+    }
+  }
+}
+
 resource "aws_sns_topic" "break_glass" {
   name              = "${var.project}-break-glass-alarm"
-  kms_master_key_id = "alias/aws/sns"
+  kms_master_key_id = aws_kms_key.break_glass.arn
 }
 
 data "aws_iam_policy_document" "break_glass_topic" {

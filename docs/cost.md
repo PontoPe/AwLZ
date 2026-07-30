@@ -41,15 +41,15 @@ security account only:
 
 | Line | Five CIS accounts | Security-only CIS |
 |---|---:|---:|
-| Three AwLZ customer-managed KMS keys | 3.05 | 3.05 |
+| Four AwLZ customer-managed KMS keys | 4.05 | 4.05 |
 | CloudTrail data events, S3 and CloudWatch Logs | 1.10 | 1.10 |
 | Config items + four boundary rules | 3.12 | 3.12 |
 | GuardDuty | 0.25 | 0.25 |
 | Security Hub CIS v3.0.0 | **13.80** | **2.76** |
 | Break-glass CloudWatch alarm | 0.10 | 0.10 |
 | PontoAntiCrack at rest | 2.35 | 2.35 |
-| **Joint conservative total** | **23.77** | **12.73** |
-| **Buffer below USD 20** | **-3.77** | **7.27** |
+| **Joint conservative total** | **24.77** | **13.73** |
+| **Buffer below USD 20** | **-4.77** | **6.27** |
 
 The five-account configuration can exceed the ceiling and therefore cannot
 remain the steady state. CIS stays enabled in all five accounts only until the
@@ -74,12 +74,16 @@ security account and keeps a conservative USD 7.27 buffer for usage variance.
 | KMS CMK — Terraform state | 1 | 1.00 | flat per key |
 | KMS CMK — CloudTrail archive | 1 | 1.00 | flat per key |
 | KMS CMK — Config delivery | 1 | 1.00 | flat per key |
+| KMS CMK — break-glass alarm topic | 1 | 1.00 | flat per key |
 | KMS requests | — | ~0.05 | bucket keys collapse most requests |
-| **Fixed subtotal** | | **~3.05** | |
+| **Fixed subtotal** | | **~4.05** | |
 
-Three keys is deliberate. A fourth for the CloudWatch log group was rejected:
-the durable copy is already CMK-encrypted in S3. The Config bucket retains its
-own key because it contains an inventory of every account.
+Four keys is deliberate. A fifth for the CloudWatch log group was rejected: the
+durable copy is already CMK-encrypted in S3. The Config bucket retains its own
+key because it contains an inventory of every account. The break-glass topic
+gained a key because `alias/aws/sns` accepts no key policy: the notification
+reveals when a member account's recovery role was used, and an AWS-managed key
+offers neither a source-bound grant nor a revocation switch independent of SNS.
 
 ## Cost guardrails
 
