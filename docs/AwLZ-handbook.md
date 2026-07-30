@@ -97,7 +97,7 @@ cd live/<stack>
 terraform init -backend-config=backend.hcl
 ```
 
-Sessions last one hour. Re-login is routine.
+Sessions last twelve hours. Log out explicitly when the work is finished.
 
 `main` is protected, so changes go through a branch and a PR. Concrete IDs live in gitignored `terraform.tfvars` and `backend.hcl`; `example.*` files are the committed templates. To recover the real values:
 
