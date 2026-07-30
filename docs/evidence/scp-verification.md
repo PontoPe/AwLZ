@@ -163,3 +163,44 @@ awlz-dev     : FullAWSAccess
 destroy**; the only pending actions are the not-yet-applied
 `require-permissions-boundary` policy and its two attachments. The out-of-band
 detach and reattach left no drift, matching the earlier recovery incident.
+
+## `require-permissions-boundary` — attached 2026-07-30
+
+The fourth SCP is now on both member OUs. It denies `iam:CreateRole` and
+`iam:PutRolePermissionsBoundary` unless the request carries the exact account
+boundary ARN, and protects the boundary policy itself.
+
+### The exemption was probed; the deny branch cannot be
+
+As `OrganizationAccountAccessRole` in `awlz-lab`, `iam:CreateRole` **without** a
+boundary returns `MalformedPolicyDocument`, not a deny — authorization passed
+and the deliberately malformed trust document stopped the request before
+anything was created. That is the property that matters most here: the recovery
+path is still able to build a role when a boundary has locked something out.
+
+The opposite branch has no honest live probe. Exercising it needs a non-exempt
+principal that can call `iam:CreateRole`, and every such principal in a member
+account would have to be created without a boundary — which is precisely what
+this control forbids. A principal *with* the boundary cannot create roles at
+all, since the boundary denies `iam:Create*`. Rather than weaken a control to
+photograph it, the deny logic is covered by five `cfn-guard` 3.2.0 cases
+(boundary present, two legitimate exceptions, boundary absent, wrong boundary)
+and by the detective rule below.
+
+### The Config rule found real drift on its first evaluation
+
+`awlz-role-permissions-boundary` in `awlz-lab`:
+
+| Result | Role |
+|---|---|
+| `COMPLIANT` | `awlz-config-recorder` |
+| `COMPLIANT` | `awlz-gha-plan-readonly` |
+| `NON_COMPLIANT` | `pac-sg-open-remediation` |
+| `NON_COMPLIANT` | `pac-s3-public-remediation` |
+| `NON_COMPLIANT` | `pac-iam-key-leak-remediation` |
+
+The three non-compliant roles belong to the sibling PontoAntiCrack deployment
+and predate the boundary. They are reported here and left alone: they are
+another owner's resources, and the preventive SCP only governs roles created
+from now on. This is the split the control was designed around — the SCP stops
+new unbounded roles, the Config rule surfaces the ones already there.

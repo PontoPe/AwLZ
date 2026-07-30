@@ -157,9 +157,19 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
 - Verified live: four boundary policies, four `ACTIVE` Config rules, the
   AwLZ-managed Config role carrying the boundary ARN by `iam get-role`, and all
   five Config recorders still `recording: true` / `lastStatus: SUCCESS`.
-- The `require-permissions-boundary` SCP is written and validated but is still
-  the only guardrail not attached; it lands with the next `live/guardrails`
-  apply.
+- The `require-permissions-boundary` SCP was then applied to both member OUs:
+  3 creates, 0 changes, 0 destroys, no drift afterwards.
+- Probed as far as is honest. The recovery exemption is live —
+  `OrganizationAccountAccessRole` creating a role without a boundary passes
+  authorization and fails only on the deliberately malformed trust document, so
+  nothing is created. The deny branch has no live probe: it would need a
+  non-exempt principal able to call `iam:CreateRole`, which cannot exist without
+  either violating this control or holding a boundary that denies `iam:Create*`.
+  That branch stays covered by the five `cfn-guard` cases and by the Config rule.
+- The Config rule found real drift on its first evaluation in `awlz-lab`: the
+  two AwLZ roles are `COMPLIANT`, and three PontoAntiCrack remediation roles
+  that predate the boundary are `NON_COMPLIANT`. They belong to the sibling
+  owner and were left untouched.
 
 ### C4 — T8 applied and observed firing 2026-07-30
 
