@@ -6,7 +6,7 @@ Depends on `live/org-root` for the account and OU IDs it attaches to.
 
 ## Why this is `live/guardrails` and not `policies/scp`
 
-`CLAUDE.md` originally planned a stack at `policies/scp`. The repo convention is that root modules live under `live/<stack>/`, so the two split:
+The original agent instructions planned a stack at `policies/scp`. The repo convention is that root modules live under `live/<stack>/`, so the two split:
 
 - `policies/scp/` — the policy documents. Data, no Terraform.
 - `live/guardrails/` — the root module that renders, creates, and attaches them.

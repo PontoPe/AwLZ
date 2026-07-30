@@ -12,7 +12,7 @@ Terraform runs each through `jsonencode(jsondecode(...))`, which both validates 
 
 Denies everything outside `sa-east-1` and `us-east-1`, keyed on `aws:RequestedRegion`.
 
-`us-east-1` is in the list because global services report there whether you like it or not — IAM, Organizations, CloudFront, Route 53, and CloudTrail global events. Removing it breaks the organization. This is settled; see the decision table in `CLAUDE.md`.
+`us-east-1` is in the list because global services report there whether you like it or not — IAM, Organizations, CloudFront, Route 53, and CloudTrail global events. Removing it breaks the organization. This is settled; see the decision table in `AGENTS.md`.
 
 The `NotAction` list covers services with no regional endpoint at all, which would otherwise be denied outright. It is deliberately short: because `us-east-1` is already allowed, most global services are covered without an exemption.
 

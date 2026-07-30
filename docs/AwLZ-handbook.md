@@ -2,7 +2,7 @@
 
 State of the project as of **2026-07-28**. Written for a person picking this up cold, including the person who built it.
 
-`CLAUDE.md` is the agent-facing version: rules, conventions, gotchas. This one is the situation report.
+`AGENTS.md` is the agent-facing version: rules, conventions, gotchas. This one is the situation report.
 
 ---
 
@@ -106,7 +106,7 @@ cd live/org-root  && terraform output      # account ids, OU ids, org id
 cd live/bootstrap && terraform output -raw backend_config
 ```
 
-Windows toolchain notes — nothing is on `PATH` in a fresh shell, and PowerShell mangles `-var-file=` — are in `CLAUDE.md`.
+Windows toolchain notes — nothing is on `PATH` in a fresh shell, and PowerShell mangles `-var-file=` — are in `AGENTS.md`.
 
 ## Traps this project already hit
 
@@ -128,7 +128,7 @@ Each cost an apply. All are documented where they bite; collected here because t
 | What is it defending against? | `docs/threat-model.md` — T1–T9 with residual risk |
 | Do the controls actually work? | `docs/evidence/` |
 | What will it cost? | `docs/cost.md` |
-| How do I not break it? | `CLAUDE.md` |
+| How do I not break it? | `AGENTS.md` |
 
 Each stack also has its own README covering what it creates and what went wrong building it.
 
