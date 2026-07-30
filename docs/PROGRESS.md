@@ -136,6 +136,20 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
   passed, 0 failed and 66 justified skips.
 - Remote plan/apply and real OIDC plan proof remain pending.
 
+### C7 — deterministic recording path staged
+
+- Read the ProvenancePipeline recording guide and reusable runner read-only.
+- Added a deterministic local driver that strictly validates the sanitized C5
+  IAM simulation evidence and displays one allowed Config read and one
+  explicitly denied Config write. The driver performs no AWS call.
+- The recorder writes an uncapped raw asciinema cast, self-tests its AWS deny
+  patterns with a fake ARN, audits before promotion, renders with `agg`, and
+  extracts a frame for pixel inspection.
+- WSL dependencies: asciinema 2.4.0 and Pillow from Ubuntu packages; official
+  `agg` 1.9.0 release verified against its published SHA-256 before install.
+- Recording remains pending on the applied C5 simulation evidence. No
+  placeholder cast or GIF will be committed.
+
 ## Roadmap
 
 | Item | State | Proof required |
