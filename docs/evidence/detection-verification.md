@@ -1,6 +1,7 @@
 # Detection verification
 
-Stack: `live/detection`. Date: 2026-07-28, within an hour of apply.
+Stack: `live/detection`. Initial verification: 2026-07-28, within an hour of
+apply. GuardDuty membership reverified: 2026-07-30T13:47:05-03:00.
 
 Account IDs redacted. Delegated administrator is `awlz-security`.
 
@@ -15,6 +16,7 @@ Account IDs redacted. Delegated administrator is `awlz-security`.
 | Config recorder — lab | same | `recording: true`, `SUCCESS` |
 | Config aggregator | created in `awlz-security` | org-wide, all regions |
 | GuardDuty | `describe-organization-configuration` | `AutoEnableOrganizationMembers: ALL` |
+| GuardDuty members | delegated `list-members --only-associated` | four of four `Enabled` |
 | Security Hub | `get-enabled-standards` | CIS v3.0.0 subscribed |
 | Access Analyzer | ORGANIZATION-scope analyzer | created in `awlz-security` |
 | Provider placement | `check` block on five recorder account IDs | five distinct accounts |
@@ -23,17 +25,49 @@ Account IDs redacted. Delegated administrator is `awlz-security`.
 
 That path had three separate defects before it worked. They are recorded in `live/detection/README.md` rather than here, because they are properties of the code, not of the deployment.
 
-## Not yet verified — pending, not passing
+## GuardDuty membership — closed 2026-07-30
 
-Both of these are time-dependent. Recording them as open rather than waiting and backfilling a claim.
+The delegated detector initially listed three enabled members: log archive, dev
+and lab. The management account was the only missing organization account even
+though auto-enable was `ALL`.
 
-**GuardDuty member enrollment.** `list-members` returns empty. `AutoEnableOrganizationMembers` is `ALL`, which covers existing accounts as well as future ones, but enrollment is asynchronous and had not completed at the time of writing. Re-check:
+The management account had no regional detector. This is a GuardDuty special
+case: the delegated administrator cannot enable that detector through
+`CreateMembers`; it must already exist before association. The detector is now
+Terraform-managed. After applying the reviewed one-resource plan, an
+idempotent `CreateMembers` call was made only for the still-missing management
+account.
 
-```bash
-aws guardduty list-members --detector-id <id> --region sa-east-1
+Sanitized delegated-administrator query:
+
+```text
+Timestamp: 2026-07-30T13:47:05-03:00
+Query: list-members --only-associated
+AutoEnableOrganizationMembers: ALL
+management: Enabled
+log-archive: Enabled
+dev: Enabled
+lab: Enabled
+UnexpectedMembers: 0
 ```
 
-Four members expected, `RelationshipStatus: Enabled`. If they are still absent after a few hours, existing accounts may need explicit `create-members` — auto-enable is documented to cover them, so that would be worth confirming before writing it up.
+Independent reverse check from the management account:
+
+```text
+ManagementDetectorCount: 1
+AdministratorMatchesSecurity: PASS
+ManagementRelationshipStatus: Enabled
+DelegatedMembersEnabled: 4/4
+PostApplyTerraformPlan: NO_CHANGES
+```
+
+The management exception and `CreateMembers` behavior are documented in the
+[GuardDuty API reference](https://docs.aws.amazon.com/guardduty/latest/APIReference/API_CreateMembers.html).
+
+## Not yet verified — pending, not passing
+
+The CIS score is time-dependent. Recording it as open rather than backfilling a
+claim.
 
 **CIS score.** `StandardsStatus` is `INCOMPLETE` and `get-findings` returns zero. Security Hub provisions controls over roughly 24 hours and evaluates against Config data that does not exist yet — the recorders started minutes ago. A score captured now would read as 0% and mean nothing.
 

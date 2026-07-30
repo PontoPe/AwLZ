@@ -1,6 +1,6 @@
 # Autonomous completion progress
 
-Last updated: **2026-07-30T13:44:16-03:00**
+Last updated: **2026-07-30T13:47:05-03:00**
 
 This is the resumable execution ledger for C1–C7. It contains no concrete
 account IDs, ARNs, organization IDs, email addresses, or credentials.
@@ -8,7 +8,7 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
 ## Current state
 
 - Branch: `codex/awlz-autonomous-owner`
-- Active item: **C1 — GuardDuty member enrollment**
+- Active item: **C2 — Security Hub cost decision**
 - AWS session: management account administrator through IAM Identity Center;
   home region `sa-east-1`; validated without recording identifiers.
 - Repository gates: `fmt`, `tflint`, `trivy`, Checkov and `validate` for all six
@@ -31,14 +31,19 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
   `9CFBD2E41AF2` contains exactly one create:
   `module.detection.aws_guardduty_detector.management`. No update, replacement
   or destroy; frequency remains `FIFTEEN_MINUTES`.
-- Apply and membership creation are pending.
+- Applied exactly that saved plan: 1 added, 0 changed, 0 destroyed.
+- Ran `CreateMembers` only for the still-missing management account.
+- Independent verification proved one management detector associated with the
+  delegated security administrator, all four delegated members `Enabled`, no
+  unexpected member and a no-change Terraform plan. Public output is in
+  `docs/evidence/detection-verification.md`.
 
 ## Roadmap
 
 | Item | State | Proof required |
 |---|---|---|
-| C1 — GuardDuty | In progress | Four delegated members with `RelationshipStatus: Enabled` |
-| C2 — Security Hub cost decision | Pending | Current state, usage and conservative AwLZ + PontoAntiCrack projection |
+| C1 — GuardDuty | **Proved** | Four delegated members with `RelationshipStatus: Enabled` |
+| C2 — Security Hub cost decision | In progress | Current state, usage and conservative AwLZ + PontoAntiCrack projection |
 | C3 — CIS control experiment | Pending | Stable baseline; lab with/without SCP measurements; independently verified reattachment |
 | C4 — T5 and T8 | Pending | Applied boundary adoption, Config detection, observed CloudTrail event and alarm |
 | C5 — CI least privilege | Pending | Member read-only roles and successful OIDC plans without write permissions |
