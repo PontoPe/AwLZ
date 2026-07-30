@@ -14,6 +14,13 @@ account_id             = "000000000000" # management account
 log_archive_account_id = "000000000000" # awlz-log-archive
 organization_id        = "o-xxxxxxxxxx"
 
+account_ids = {
+  log-archive = "000000000000"
+  security    = "000000000000"
+  dev         = "000000000000"
+  lab         = "000000000000"
+}
+
 state_bucket_arn = "arn:aws:s3:::awlz-tfstate-000000000000"
 
 # COMPLIANCE means nobody — including root — can delete these objects before

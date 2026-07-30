@@ -17,3 +17,13 @@ output "object_lock" {
   description = "Retention in force on every delivered object."
   value       = module.logging.object_lock
 }
+
+output "break_glass_alarm_name" {
+  description = "T8 CloudWatch alarm name."
+  value       = module.logging.break_glass_alarm_name
+}
+
+output "break_glass_topic_arn" {
+  description = "Encrypted notification topic for the T8 alarm."
+  value       = module.logging.break_glass_topic_arn
+}

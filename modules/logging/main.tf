@@ -2,6 +2,14 @@ locals {
   bucket_name = "${var.project}-org-trail-${var.log_archive_account_id}"
   trail_name  = "${var.project}-org-trail"
 
+  break_glass_filter_terms = [
+    for arn in var.break_glass_role_arns :
+    "($.requestParameters.roleArn = \"${arn}\")"
+  ]
+  break_glass_filter_pattern = "{ ($.eventSource = \"sts.amazonaws.com\") && ($.eventName = \"AssumeRole\") && (${join(" || ", local.break_glass_filter_terms)}) }"
+  break_glass_alarm_name     = "${var.project}-break-glass-assume-role"
+  break_glass_alarm_arn      = "arn:aws:cloudwatch:${var.region}:${data.aws_caller_identity.mgmt.account_id}:alarm:${local.break_glass_alarm_name}"
+
   # Organization trails write under AWSLogs/<org-id>/<account-id>/, not the
   # single-account AWSLogs/<account-id>/ path. Getting this wrong produces a
   # trail that creates cleanly and then silently fails to deliver.
@@ -357,6 +365,88 @@ resource "aws_cloudwatch_log_group" "trail" {
 
   name              = "/aws/cloudtrail/${local.trail_name}"
   retention_in_days = var.cloudwatch_retention_days
+}
+
+# T8: the recovery path is deliberately powerful, so use is never silent.
+resource "aws_cloudwatch_log_metric_filter" "break_glass" {
+  name           = "${var.project}-break-glass-assume-role"
+  pattern        = local.break_glass_filter_pattern
+  log_group_name = aws_cloudwatch_log_group.trail.name
+
+  metric_transformation {
+    name      = "BreakGlassAssumeRole"
+    namespace = "${var.project}/Security"
+    value     = "1"
+  }
+}
+
+resource "aws_sns_topic" "break_glass" {
+  name              = "${var.project}-break-glass-alarm"
+  kms_master_key_id = "alias/aws/sns"
+}
+
+data "aws_iam_policy_document" "break_glass_topic" {
+  statement {
+    sid    = "OwnerAdministration"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.mgmt.account_id}:root"]
+    }
+
+    actions   = ["sns:*"]
+    resources = [aws_sns_topic.break_glass.arn]
+  }
+
+  statement {
+    sid    = "CloudWatchAlarmPublish"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudwatch.amazonaws.com"]
+    }
+
+    actions   = ["sns:Publish"]
+    resources = [aws_sns_topic.break_glass.arn]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.mgmt.account_id]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = [local.break_glass_alarm_arn]
+    }
+  }
+}
+
+resource "aws_sns_topic_policy" "break_glass" {
+  arn    = aws_sns_topic.break_glass.arn
+  policy = data.aws_iam_policy_document.break_glass_topic.json
+}
+
+resource "aws_cloudwatch_metric_alarm" "break_glass" {
+  alarm_name          = local.break_glass_alarm_name
+  alarm_description   = "OrganizationAccountAccessRole was assumed in a member account."
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  threshold           = 1
+  period              = 60
+  statistic           = "Sum"
+  namespace           = "${var.project}/Security"
+  metric_name         = "BreakGlassAssumeRole"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.break_glass.arn]
+
+  depends_on = [
+    aws_cloudwatch_log_metric_filter.break_glass,
+    aws_sns_topic_policy.break_glass,
+  ]
 }
 
 resource "aws_iam_role" "trail_to_cwlogs" {

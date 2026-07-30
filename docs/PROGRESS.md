@@ -85,6 +85,19 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
 - Remote planning and apply remain pending behind C3. No boundary, Config rule
   or SCP change has reached AWS from this staged implementation.
 
+### C4 — T8 implementation staged, not applied
+
+- Added an exact-ARN CloudTrail metric filter for all four
+  `OrganizationAccountAccessRole` roles, a one-minute CloudWatch alarm and an
+  encrypted SNS target with SourceAccount and SourceArn constraints.
+- No endpoint or address is hardcoded. The alarm exists independently of
+  notification-channel ownership.
+- Terraform validation, tflint, Trivy and Checkov pass; Checkov reports 397
+  passed, 0 failed and 66 justified skips.
+- Remote plan, apply, harmless observed role assumption and `ALARM` transition
+  remain pending. No logging resource has changed in AWS from this staged
+  implementation.
+
 ## Roadmap
 
 | Item | State | Proof required |

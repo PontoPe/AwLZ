@@ -30,6 +30,18 @@ Both providers set `allowed_account_ids`, so a wrong profile fails instead of wr
 | management | Organization trail: multi-region, global service events, log file validation, CMK-encrypted |
 | management | CloudWatch log group (14 days) + scoped role, so alarms and subscriptions have something to attach to |
 
+## T8 — break-glass alarm
+
+The existing CloudWatch Logs copy of the organization trail has a metric
+filter for `sts:AssumeRole` where `requestParameters.roleArn` is one of the
+four exact member-account `OrganizationAccountAccessRole` ARNs. One event
+raises `awlz-break-glass-assume-role` for a one-minute period.
+
+The alarm publishes to an SNS topic encrypted with the AWS-managed SNS key.
+The topic policy accepts publication only from CloudWatch in the management
+account and only from the exact alarm ARN. The repository intentionally does
+not hardcode an email address or create an unconfirmed subscription.
+
 ## Object Lock is a commitment, not a checkbox
 
 COMPLIANCE mode means **no principal can delete these objects before retention expires** — not the account root, not AWS Support. That is precisely the property that makes the archive worth having: it survives compromise of the management account.

@@ -15,4 +15,8 @@ module "logging" {
   object_lock_retention_days = var.object_lock_retention_days
 
   data_event_bucket_arns = [var.state_bucket_arn]
+  break_glass_role_arns = [
+    for id in values(var.account_ids) :
+    "arn:aws:iam::${id}:role/OrganizationAccountAccessRole"
+  ]
 }

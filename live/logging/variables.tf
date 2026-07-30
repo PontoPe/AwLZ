@@ -36,6 +36,24 @@ variable "log_archive_account_id" {
   }
 }
 
+variable "account_ids" {
+  description = "Member account short name to ID, used to build exact break-glass role ARNs."
+
+  type = object({
+    log-archive = string
+    security    = string
+    dev         = string
+    lab         = string
+  })
+
+  validation {
+    condition = alltrue([
+      for id in values(var.account_ids) : can(regex("^[0-9]{12}$", id))
+    ])
+    error_message = "every account id must be exactly 12 digits."
+  }
+}
+
 variable "organization_id" {
   description = "Organization ID. Scopes the bucket policy and the log prefix."
   type        = string

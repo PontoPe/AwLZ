@@ -142,6 +142,14 @@ Each decision: context, options, choice, consequence. Short. Append, never rewri
 - **Decision:** Create the same `awlz-permissions-boundary` in each member account. An SCP requires it on `CreateRole`, prevents non-break-glass principals from removing or replacing it, and protects the policy document. A Guard-based Config rule compares the exact account-local ARN on every customer-managed role. Service-linked, Identity Center and `OrganizationAccountAccessRole` roles are explicit exceptions.
 - **Consequences:** New workload roles cannot exceed the boundary even if an identity policy is later widened. Existing PontoAntiCrack roles stay under their owning state and are reported as noncompliant evidence instead of being changed here. `OrganizationAccountAccessRole` remains the audited recovery path if a boundary is defective; T5 is not marked closed until the plan is applied and both compliant and noncompliant evaluations are observed.
 
+### ADR-018 — Break-glass use is matched against exact role ARNs
+
+- **Status:** accepted; deployment proof pending
+- **Context:** T8 depends on `OrganizationAccountAccessRole` remaining available for recovery, but that power must not be silent. Matching only a role-name fragment would let unrelated request data create false alarms.
+- **Options:** CloudTrail Lake query after an incident; EventBridge rule; CloudWatch Logs metric filter and alarm on the existing organization-trail tail.
+- **Decision:** Build exact role ARNs from the four validated member account IDs, match `sts:AssumeRole` plus `requestParameters.roleArn`, emit one custom metric, and alarm into an encrypted SNS topic. No email endpoint is hardcoded; subscriptions are an external notification concern.
+- **Consequences:** Every break-glass assumption can be observed within the one-minute alarm period without adding another log pipeline. The topic policy accepts alarm publication only from the management account and exact alarm ARN. T8 is not marked closed until a harmless role assumption is present in CloudTrail and the alarm is observed in `ALARM`.
+
 ---
 
 ## Open questions
@@ -149,4 +157,4 @@ Each decision: context, options, choice, consequence. Short. Append, never rewri
 - [ ] Apply and verify ADR-017. T5 stays partial until the boundary SCP and all four Config rules are observed.
 - [ ] Identity Center roles (`aws-reserved/sso.amazonaws.com/*`) are excluded from guardrail-role protection, because denying IAM writes there breaks permission-set provisioning. Needs a condition exempting the Identity Center service principal.
 - [ ] The break-glass path — management account root to `OrganizationAccountAccessRole` — is documented and partially exercised, but has never been rehearsed end to end from a genuine Identity Center outage. T8 stays open until it is.
-- [ ] No alarm on break-glass role assumption.
+- [ ] Apply ADR-018 and observe one real break-glass event and alarm transition.

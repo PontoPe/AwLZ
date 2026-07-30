@@ -30,3 +30,13 @@ output "object_lock" {
     days = var.object_lock_retention_days
   }
 }
+
+output "break_glass_alarm_name" {
+  description = "CloudWatch alarm raised by an OrganizationAccountAccessRole assumption."
+  value       = aws_cloudwatch_metric_alarm.break_glass.alarm_name
+}
+
+output "break_glass_topic_arn" {
+  description = "Encrypted SNS topic targeted by the break-glass alarm."
+  value       = aws_sns_topic.break_glass.arn
+}
