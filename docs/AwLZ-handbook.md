@@ -1,6 +1,6 @@
 # Handoff — AwLZ
 
-State of the project as of **2026-07-28**. Written for a person picking this up cold, including the person who built it.
+State of the project as of **2026-07-30**. Written for a person picking this up cold, including the person who built it.
 
 `AGENTS.md` is the agent-facing version: rules, conventions, gotchas. This one is the situation report.
 
@@ -45,48 +45,74 @@ All six stacks applied against real AWS and verified. Everything below was check
 |---|---|
 | `live/bootstrap` | S3 state + CMK, versioning, TLS-only, native locking |
 | `live/org-root` | 2 OUs, 4 accounts ACTIVE, centralized root access on, 8 trusted service principals |
-| `live/guardrails` | 3 SCPs attached to both OUs |
-| `live/logging` | Org trail → Object Lock COMPLIANCE 30d archive in a separate account; 14-day CloudWatch tail |
-| `live/detection` | GuardDuty + Security Hub CIS 3.0.0 + Config ×5 accounts + Access Analyzer, delegated |
-| `live/ci-oidc` | OIDC provider, read-only plan role, admin apply role gated by the `production` environment |
+| `live/guardrails` | 4 SCPs attached to both OUs, including the boundary requirement |
+| `live/logging` | Org trail → Object Lock COMPLIANCE 30d archive in a separate account; 14-day CloudWatch tail; T8 break-glass alarm on a CMK-encrypted topic |
+| `live/detection` | GuardDuty ×5 + Security Hub CIS 3.0.0 in the delegated administrator + Config ×5 + Access Analyzer + T5 permission boundaries and their Config rule |
+| `live/ci-oidc` | OIDC provider, read-only plan role, `awlz-gha-plan-readonly` per member account, admin apply role gated by the `production` environment |
 
-**CI is green and enforcing.** `fmt`, `tflint`, `trivy`, `checkov`, `validate` across six stacks, and a real `terraform plan` against AWS via OIDC. `main` requires a pull request *and* passing checks — a red run cannot merge.
+**CI is green and enforcing.** `fmt`, `tflint`, `trivy`, `checkov`, `validate` across six stacks, and a real `terraform plan` against AWS via OIDC for **all six** — `logging`, `detection` and `ci-oidc` rejoined the plan matrix once the member read-only roles existed, so CI holds administrator nowhere. `main` requires a pull request *and* passing checks — a red run cannot merge.
 
-Gate baseline: **checkov 376 passed / 0 failed / 21 skipped**, trivy and tflint clean. Every skip carries a written reason inline; several carry a threat-model ID and the stack that closes it.
+Gate baseline: **checkov 477 passed / 0 failed / 69 skipped**, trivy and tflint clean. Every skip carries a written reason inline; several carry a threat-model ID and the stack that closes it.
 
 ## What is not done
 
-Three things, and none of them are code.
+One thing, and it is a calendar, not code.
 
-**1. CIS score — waiting on AWS.** Security Hub is `PENDING` with 37 findings and climbing; controls provision over roughly 24 hours against Config data that only started flowing today. A score captured now would be an artifact of timing.
+**Cost actuals — waiting on a closed billing window.** Cost Explorer still
+returns `Estimated: true` for every day this organization has existed. The
+earliest defensible retry is **2026-08-02T12:00:00-03:00** for the 28 July–1
+August window, and only if the API stops saying estimated. `docs/cost.md` shows
+the arithmetic and labels the projection a projection.
 
-When it settles, run the experiment in `docs/evidence/detection-verification.md`: detach `awlz-lab`'s SCPs, score it, reattach, score again. That measures what the guardrails buy, on an account that exists to be broken.
+Everything else that was open on 2026-07-28 is closed:
 
-> The README originally promised "CIS score **before vs after**". That is no longer obtainable — the guardrails went in before Security Hub did, so there is no un-hardened "before" left organization-wide. The lab control group is the honest replacement, and the docs say so rather than quietly redefining the claim.
+**CIS score — done, and the result is negative.** `awlz-lab` was measured with
+its SCPs, without them, and after reattachment. All 35 controls are identical in
+both states, because no CIS v3.0.0 control reads an SCP. A benchmark score
+describes resource configuration; it cannot describe a preventive guardrail. The
+behavioural probes — denied, allowed, denied again — are what show the SCPs
+working. Full write-up in `docs/evidence/scp-verification.md`.
 
-**2. Cost actuals — waiting on billing.** Cost Explorer returns `DataUnavailableException` for an organization created today. `docs/cost.md` has estimates with the arithmetic shown and is explicit that they are not measurements.
+> The README originally promised "CIS score **before vs after**". That was not obtainable — the guardrails went in before Security Hub did, so there is no un-hardened "before" left organization-wide. The lab control group replaced it, and it returned a null result that is published as one.
 
-**3. GuardDuty member enrollment — unconfirmed.** This is the one control that is configured but **not demonstrated**. `AutoEnableOrganizationMembers` is `ALL`, but `list-members` returned 0 for over an hour after apply.
+**GuardDuty member enrollment — closed.** The management account had no regional
+detector, and the delegated administrator cannot create one through
+`CreateMembers`. The detector is Terraform-managed now and all four members are
+`Enabled`, verified from both directions.
 
-```bash
-aws guardduty list-members --detector-id <id> --region sa-east-1
-```
+**T5 and T8 — live.** Permission boundaries in four accounts with a Config rule
+that detects any customer role without one, an SCP requiring the boundary on new
+roles, and a CloudWatch alarm on assumption of the four recovery-role ARNs. The
+alarm reached `ALARM` on real assumptions rather than a synthetic metric.
 
-Expect four members, `RelationshipStatus: Enabled`. If still empty, existing accounts may need explicit `create-members` despite auto-enable being documented to cover them. Treat it as open until the output says otherwise.
+**Least-privilege CI — live.** `awlz-gha-plan-readonly` per member account,
+trusting only the management plan role, holding `ReadOnlyAccess` and the T5
+boundary.
 
 ## Budget
 
 **USD 20/month ceiling**, alerts at 85% and 100% actual plus 100% forecast.
 
-Roughly **USD 3/month is fixed** (three CMKs). The variable part is detection, projected **USD 11–36/month total** — which straddles the ceiling.
+**USD 4.05/month is fixed** — four CMKs: Terraform state, the CloudTrail
+archive, the Config delivery bucket, and the break-glass alarm topic. The fourth
+was added on 2026-07-30 because `alias/aws/sns` accepts no key policy, and an
+alert announcing recovery-role use is exactly what an attacker would want to
+read or suppress.
 
-**Security Hub is the risk.** At `auto_enable_standards = "DEFAULT"` it is projected USD 4–18/month on its own, because per-account CIS scoring is what the evidence needs. The lever is one line in `live/detection/terraform.tfvars`:
+The cost lever was decided and applied rather than left as a note. Five CIS
+subscriptions projected **USD 24.77/month** jointly with PontoAntiCrack, over
+the ceiling. CIS v3.0.0 is now retained in `awlz-security` only, with
+future-account auto-enable at `NONE`:
 
 ```hcl
-auto_enable_standards = "NONE"
+auto_enable_standards    = "NONE"
+member_standards_enabled = false
 ```
 
-GuardDuty's first 30 days are free, so **August will understate the steady state**. Do not read the first invoice as representative.
+That projects **USD 13.73/month**, leaving USD 6.27 of headroom. What is lost is
+the live per-account score; the timestamped C3 artifact remains. GuardDuty's
+first 30 days are free, so **August will understate the steady state**. Do not
+read the first invoice as representative.
 
 ## Working on it
 
@@ -124,7 +150,7 @@ Each cost an apply. All are documented where they bite; collected here because t
 
 | Question | File |
 |---|---|
-| Why is it built this way? | `docs/architecture.md` — 15 ADRs |
+| Why is it built this way? | `docs/architecture.md` — 19 ADRs |
 | What is it defending against? | `docs/threat-model.md` — T1–T9 with residual risk |
 | Do the controls actually work? | `docs/evidence/` |
 | What will it cost? | `docs/cost.md` |
@@ -134,9 +160,15 @@ Each stack also has its own README covering what it creates and what went wrong 
 
 ## Next session, in order
 
-1. Re-check GuardDuty enrollment. Close it or fix it.
-2. Once Security Hub settles, capture the CIS baseline and run the `awlz-lab` control-group experiment.
-3. Permission boundaries + a Config rule for T5; a CloudWatch alarm on break-glass role assumption for T8. Both are open items in the threat model.
-4. Give CI a read-only role per member account so `live/logging` and `live/detection` can rejoin the plan matrix — they are excluded because planning them currently needs an admin role, and a PR-triggered role must not hold that.
-5. Cost actuals after a billing cycle.
-6. Demo recording.
+Items 1–4 and 6 of the previous list are done and merged in
+[PR #11](https://github.com/PontoPe/AwLZ/pull/11). What remains:
+
+1. **Cost actuals.** On or after `2026-08-02T12:00:00-03:00`, query Cost
+   Explorer for 28 July–1 August. If it still returns `Estimated: true`, do not
+   relabel it — record the refusal and pick the next date. The query is in
+   `docs/cost.md`.
+2. **Hand the boundary finding to PontoAntiCrack.** The T5 Config rule reports
+   `pac-sg-open-remediation`, `pac-s3-public-remediation` and
+   `pac-iam-key-leak-remediation` in `awlz-lab` as `NON_COMPLIANT`; they predate
+   the boundary. That is the sibling owner's call — adopt the boundary or record
+   an exception. Do not modify another project's roles from here.
