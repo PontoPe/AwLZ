@@ -69,6 +69,22 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
   evaluated only 17–20 of 36. Those partial scores are not an admissible
   baseline and will not be used for the control experiment.
 
+### C4 — T5 implementation staged, not applied
+
+- Added an account-local permissions boundary for each of the four member
+  accounts, adoption by AwLZ-managed Config roles, and a Guard custom policy
+  rule that checks the exact boundary ARN.
+- Added a fourth SCP that requires the boundary on new roles and protects both
+  the attachment and policy. `OrganizationAccountAccessRole` is the sole
+  recovery exception.
+- The Guard rule passed local positive, negative, service-linked and
+  break-glass test cases with official `cfn-guard` 3.2.0.
+- Terraform validation, tflint, Trivy and Checkov pass. Checkov reports 384
+  passed, 0 failed and 66 justified skips; boundary false positives carry an
+  individual inline reason.
+- Remote planning and apply remain pending behind C3. No boundary, Config rule
+  or SCP change has reached AWS from this staged implementation.
+
 ## Roadmap
 
 | Item | State | Proof required |

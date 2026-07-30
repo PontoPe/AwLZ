@@ -402,8 +402,9 @@ data "aws_iam_policy_document" "config_bucket" {
 resource "aws_iam_role" "aggregator" {
   provider = aws.security
 
-  name               = "${var.project}-config-aggregator"
-  assume_role_policy = data.aws_iam_policy_document.aggregator_assume.json
+  name                 = "${var.project}-config-aggregator"
+  assume_role_policy   = data.aws_iam_policy_document.aggregator_assume.json
+  permissions_boundary = var.security_permissions_boundary_arn
 }
 
 data "aws_iam_policy_document" "aggregator_assume" {

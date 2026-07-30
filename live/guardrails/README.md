@@ -68,6 +68,12 @@ The exemption is only as tight as the role names in it. Anything able to create 
 
 No blanket root-deny SCP. Centralized root access already deleted member root credentials, and a root deny would also block `RootSessions`, the break-glass path. Reasoning in `policies/scp/README.md`; revisit if centralized root access is ever disabled.
 
+`require-permissions-boundary` applies to the union of the existing guardrail
+targets. This is deliberate: the policy must not exist unattached because an
+older private `terraform.tfvars` map predates it. New customer roles require
+the account-local `awlz-permissions-boundary`; only
+`OrganizationAccountAccessRole` can recover or replace the boundary.
+
 Identity Center's `aws-reserved/sso.amazonaws.com/*` roles are not protected by `protect-guardrail-roles` — denying IAM writes there would break permission-set provisioning. Needs a condition exempting the Identity Center service principal.
 
 ## Next

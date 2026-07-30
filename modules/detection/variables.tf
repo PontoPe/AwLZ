@@ -77,6 +77,16 @@ variable "auto_enable_standards" {
   }
 }
 
+variable "security_permissions_boundary_arn" {
+  description = "Account-local boundary for the Config aggregator role in the security account."
+  type        = string
+
+  validation {
+    condition     = can(regex("^arn:[^:]+:iam::[0-9]{12}:policy/[A-Za-z0-9+=,.@_/-]+$", var.security_permissions_boundary_arn))
+    error_message = "security_permissions_boundary_arn must be an IAM managed-policy ARN."
+  }
+}
+
 variable "guardduty_finding_frequency" {
   description = "How often GuardDuty publishes findings to the administrator. Six hours is the default; fifteen minutes costs nothing extra and shortens time-to-detect."
   type        = string

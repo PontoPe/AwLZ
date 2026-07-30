@@ -65,6 +65,20 @@ defaults; `"NONE"` avoids those additional checks.
 
 Config history expires after 90 days. CloudTrail is the immutable record of *who changed what*; Config snapshots are inputs to rule evaluation and lose value once superseded.
 
+## T5 — permissions boundary and drift rule
+
+Each member account gets an account-local `awlz-permissions-boundary`. It does
+not grant access: effective permissions remain the intersection of the role's
+identity policy, the boundary and the OU SCPs. The boundary explicitly caps IAM
+and Organizations escalation, audit/detection tampering and KMS key
+destruction.
+
+A Guard custom policy rule evaluates every recorded IAM role against the exact
+boundary ARN for its own account. Service-linked roles, Identity Center roles
+and `OrganizationAccountAccessRole` are excluded because they cannot safely
+adopt this customer boundary. Existing workload roles owned by another
+Terraform state are reported rather than modified.
+
 ## Verify
 
 ```bash

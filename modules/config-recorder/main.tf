@@ -14,8 +14,9 @@ data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
 
 resource "aws_iam_role" "config" {
-  name               = "${var.project}-config-recorder"
-  assume_role_policy = data.aws_iam_policy_document.assume.json
+  name                 = "${var.project}-config-recorder"
+  assume_role_policy   = data.aws_iam_policy_document.assume.json
+  permissions_boundary = var.permissions_boundary_arn
 }
 
 data "aws_iam_policy_document" "assume" {

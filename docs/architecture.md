@@ -134,11 +134,19 @@ Each decision: context, options, choice, consequence. Short. Append, never rewri
 - **Decision:** Terraform enables Security Hub without default standards in management, log archive, dev and lab, associates those four with `awlz-security`, and subscribes all five accounts explicitly to CIS v3.0.0. Keep local configuration for future accounts until cost evidence justifies a separate change.
 - **Consequences:** The benchmark has one named version and a reproducible per-account denominator. FSBP and CIS v1.2.0 are not silently added to existing accounts. The root module has repeated resources because provider aliases cannot be iterated. Future-account defaults remain a separate cost decision; a new account is not considered covered by CIS v3.0.0 until Terraform adds its provider and explicit subscription.
 
+### ADR-017 — Permission boundaries are preventive and independently detected
+
+- **Status:** accepted; deployment proof pending
+- **Context:** Protecting only the `awlz-*` role name does not stop a member account from creating a differently named role with broader permissions. Existing roles are owned by more than one Terraform state, so silently adopting or mutating all of them here would create cross-repository drift.
+- **Options:** Rename-only SCP protection; mutate every existing role; require a stable account-local boundary for new roles and detect grandfathered drift.
+- **Decision:** Create the same `awlz-permissions-boundary` in each member account. An SCP requires it on `CreateRole`, prevents non-break-glass principals from removing or replacing it, and protects the policy document. A Guard-based Config rule compares the exact account-local ARN on every customer-managed role. Service-linked, Identity Center and `OrganizationAccountAccessRole` roles are explicit exceptions.
+- **Consequences:** New workload roles cannot exceed the boundary even if an identity policy is later widened. Existing PontoAntiCrack roles stay under their owning state and are reported as noncompliant evidence instead of being changed here. `OrganizationAccountAccessRole` remains the audited recovery path if a boundary is defective; T5 is not marked closed until the plan is applied and both compliant and noncompliant evaluations are observed.
+
 ---
 
 ## Open questions
 
-- [ ] Permission boundaries for role creation in member accounts, plus the Config rule that catches drift. T5 stays partial until both exist.
+- [ ] Apply and verify ADR-017. T5 stays partial until the boundary SCP and all four Config rules are observed.
 - [ ] Identity Center roles (`aws-reserved/sso.amazonaws.com/*`) are excluded from guardrail-role protection, because denying IAM writes there breaks permission-set provisioning. Needs a condition exempting the Identity Center service principal.
 - [ ] The break-glass path — management account root to `OrganizationAccountAccessRole` — is documented and partially exercised, but has never been rehearsed end to end from a genuine Identity Center outage. T8 stays open until it is.
 - [ ] No alarm on break-glass role assumption.
