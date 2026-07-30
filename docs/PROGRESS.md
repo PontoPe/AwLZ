@@ -1,6 +1,6 @@
 # Autonomous completion progress
 
-Last updated: **2026-07-30T13:36:47-03:00**
+Last updated: **2026-07-30T13:44:16-03:00**
 
 This is the resumable execution ledger for C1–C7. It contains no concrete
 account IDs, ARNs, organization IDs, email addresses, or credentials.
@@ -12,9 +12,26 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
 - AWS session: management account administrator through IAM Identity Center;
   home region `sa-east-1`; validated without recording identifiers.
 - Repository gates: `fmt`, `tflint`, `trivy`, Checkov and `validate` for all six
-  live stacks passed on 2026-07-30. Checkov reported 367 passed, 0 failed and
-  21 skipped.
-- Lab state: no SCP experiment, plan or apply started by this execution.
+  live stacks passed on 2026-07-30. After the C1 resource was added, Checkov
+  reported 368 passed, 0 failed and 22 justified skips.
+- Lab state: the PontoAntiCrack owner reported the lab released with no live
+  operation. No lab-targeted plan, apply or SCP experiment was started here.
+
+## Execution log
+
+### C1 — GuardDuty
+
+- Observed organization auto-enable `ALL`.
+- Delegated membership was `Enabled` for log archive, dev and lab, but the
+  management account was absent.
+- Root cause: the management account had no regional detector. GuardDuty
+  requires that detector to exist before `CreateMembers`; delegated auto-enable
+  cannot create it for this special account.
+- Added one Terraform-managed management detector. Saved plan digest prefix
+  `9CFBD2E41AF2` contains exactly one create:
+  `module.detection.aws_guardduty_detector.management`. No update, replacement
+  or destroy; frequency remains `FIFTEEN_MINUTES`.
+- Apply and membership creation are pending.
 
 ## Roadmap
 

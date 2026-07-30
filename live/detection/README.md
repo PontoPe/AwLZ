@@ -78,3 +78,12 @@ All five recorders `recording: true` / `lastStatus: SUCCESS`, GuardDuty `AutoEna
 Security Hub reports `StandardsStatus: INCOMPLETE` for a while after enabling, and GuardDuty member enrollment lags the API call. Neither is an error.
 
 Results in [docs/evidence/detection-verification.md](../../docs/evidence/detection-verification.md).
+
+### GuardDuty management-account enrollment
+
+The Organizations management account is a GuardDuty special case. The
+delegated administrator cannot enable its detector through `CreateMembers`, so
+`modules/detection` creates that detector in the management account first.
+Organization auto-enable remains `ALL`; an idempotent `CreateMembers` call is
+still required if the already-existing management account has not been
+associated automatically.
