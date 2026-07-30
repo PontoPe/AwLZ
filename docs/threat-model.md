@@ -52,6 +52,10 @@ Anything here that cannot be *prevented* must be *detected* — those go to [Pon
 - The **management** account root is held by the operator with hardware MFA on two devices, password stored apart from them, and is never used for automation. Member accounts have no root credentials at all — see T9.
 - Identity Center is the only interactive path in. If it fails, the recovery path is management account root → `OrganizationAccountAccessRole`. That chain has not been rehearsed; T8's residual risk covers it.
 - GitHub organization has 2FA enforced and branch protection on `main`.
+- Security Hub CIS v3.0.0 coverage is explicit in all five existing accounts;
+  organization auto-enable alone is not treated as evidence for accounts that
+  predate `live/detection`. Security Hub is compliance evidence and detection
+  aggregation, not a substitute for the preventive SCPs.
 
 ## Out of scope
 

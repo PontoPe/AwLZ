@@ -126,6 +126,14 @@ Each decision: context, options, choice, consequence. Short. Append, never rewri
 - **Decision:** AdministratorAccess, with the control placed entirely on the trust policy.
 - **Consequences:** An accurate least-privilege policy for a role that manages the organization is administrator with extra steps and a false sense of containment — and it fails open as new services are added, at the worst moment. The real boundary is the `sub` claim: only a workflow that has passed the `production` GitHub Environment can assume it. The plan role, which runs on unreviewed pull requests, is read-only and explicitly denied state writes. Sessions cap at one hour and every action lands in the org trail.
 
+### ADR-016 — Existing Security Hub accounts are explicit
+
+- **Status:** accepted
+- **Context:** Local organization auto-enable applies only to accounts that join after it is configured. All four member accounts predated `live/detection`, so only the delegated security account had Security Hub and CIS v3.0.0; configuration was present but the claimed organization evidence was not.
+- **Options:** Keep local configuration and create the existing memberships explicitly; migrate to central configuration; rely on out-of-band `CreateMembers`.
+- **Decision:** Terraform enables Security Hub without default standards in management, log archive, dev and lab, associates those four with `awlz-security`, and subscribes all five accounts explicitly to CIS v3.0.0. Keep local configuration for future accounts until cost evidence justifies a separate change.
+- **Consequences:** The benchmark has one named version and a reproducible per-account denominator. FSBP and CIS v1.2.0 are not silently added to existing accounts. The root module has repeated resources because provider aliases cannot be iterated. Future-account defaults remain a separate cost decision; a new account is not considered covered by CIS v3.0.0 until Terraform adds its provider and explicit subscription.
+
 ---
 
 ## Open questions

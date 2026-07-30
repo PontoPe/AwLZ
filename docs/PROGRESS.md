@@ -1,6 +1,6 @@
 # Autonomous completion progress
 
-Last updated: **2026-07-30T13:47:05-03:00**
+Last updated: **2026-07-30T13:55:03-03:00**
 
 This is the resumable execution ledger for C1–C7. It contains no concrete
 account IDs, ARNs, organization IDs, email addresses, or credentials.
@@ -37,6 +37,22 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
   delegated security administrator, all four delegated members `Enabled`, no
   unexpected member and a no-change Terraform plan. Public output is in
   `docs/evidence/detection-verification.md`.
+
+### C2/C3 — Security Hub state and enrollment
+
+- State query found only `awlz-security` subscribed to Security Hub. Its CIS
+  v3.0.0 subscription is `READY` and controls are `READY_FOR_UPDATES`.
+- Management, log archive, dev and lab were not subscribed. Local organization
+  auto-enable does not retroactively cover accounts that already existed.
+- ADR-016 makes the existing-account topology explicit: enable Security Hub
+  with default standards off, associate the four accounts to the delegated
+  administrator, and subscribe all five accounts to CIS v3.0.0 only.
+- Reviewed saved plan digest prefix `63D0C52928B4`: 12 creates, 0 updates,
+  0 destroys. The creates are four account enablements, four organization
+  memberships and four CIS v3.0.0 subscriptions. Every account has
+  `enable_default_standards = false`; every member has `invite = false`.
+- PontoAntiCrack remained idle with the lab released before planning. Apply is
+  pending.
 
 ## Roadmap
 

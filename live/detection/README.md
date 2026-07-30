@@ -58,7 +58,10 @@ This stack is the entire recurring bill.
 | Security Hub | control evaluations per account per month |
 | KMS | one CMK for the Config bucket |
 
-`auto_enable_standards = "DEFAULT"` gives every member account its own CIS score, which is what the evidence is measured from. `"NONE"` is cheaper and leaves member accounts unscored.
+Existing accounts are enabled explicitly with only CIS v3.0.0, which gives the
+evidence one reproducible denominator. `auto_enable_standards = "DEFAULT"`
+applies only to accounts that join later and enables AWS's FSBP and CIS v1.2.0
+defaults; `"NONE"` avoids those additional checks.
 
 Config history expires after 90 days. CloudTrail is the immutable record of *who changed what*; Config snapshots are inputs to rule evaluation and lose value once superseded.
 

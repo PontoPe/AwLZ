@@ -56,7 +56,7 @@ variable "config_retention_days" {
 }
 
 variable "auto_enable_standards" {
-  description = "DEFAULT gives member accounts a CIS score of their own; NONE is cheaper and leaves them unscored."
+  description = "Whether future accounts get AWS's default FSBP and CIS v1.2.0 standards. Existing accounts use explicit CIS v3.0.0 subscriptions."
   type        = string
   default     = "DEFAULT"
 }

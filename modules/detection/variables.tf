@@ -60,12 +60,12 @@ variable "security_standards" {
 
 variable "auto_enable_standards" {
   description = <<-EOT
-    Whether member accounts joining Security Hub get the default standards.
+    Whether future member accounts joining Security Hub get AWS's default
+    standards (FSBP and CIS v1.2.0).
 
-    "DEFAULT" is required for a per-account CIS score, which is the deliverable
-    — findings aggregate to the administrator either way, but the *score* is
-    computed per account. "NONE" is cheaper and leaves member accounts
-    unscored.
+    This does not cover existing organization accounts and does not enable the
+    CIS v3.0.0 benchmark used for this project's evidence. Existing accounts
+    and their CIS v3.0.0 subscriptions are explicit in live/detection.
   EOT
 
   type    = string
