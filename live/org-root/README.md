@@ -49,7 +49,7 @@ terraform plan -var-file=terraform.tfvars -out=tfplan
 terraform apply tfplan
 ```
 
-PowerShell mangles `-var-file=…`; splat an array instead — see the toolchain notes in `CLAUDE.md`.
+PowerShell mangles `-var-file=…`; splat an array instead — see the toolchain notes in `AGENTS.md`.
 
 Account creation is slow. AWS serializes it, so four accounts take roughly 4–12 minutes total, and a single one occasionally sits at `IN_PROGRESS` for several minutes on its own.
 
