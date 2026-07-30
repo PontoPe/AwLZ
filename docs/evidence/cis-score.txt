@@ -1,0 +1,10 @@
+CIS v3.0.0 score by account
+Standard:  standards/cis-aws-foundations-benchmark/v/3.0.0
+Region:    sa-east-1
+Timestamp: 2026-07-30T15:31:39-03:00
+
+awlz-dev: passed=23 failed=12 unknown=0 denominator=35 score=65.7%
+awlz-lab: passed=24 failed=11 unknown=0 denominator=35 score=68.5%
+awlz-log-archive: passed=24 failed=12 unknown=0 denominator=36 score=66.6%
+awlz-security: passed=24 failed=11 unknown=0 denominator=35 score=68.5%
+management: passed=24 failed=11 unknown=0 denominator=35 score=68.5%

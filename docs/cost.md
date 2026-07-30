@@ -52,8 +52,9 @@ security account only:
 | **Buffer below USD 20** | **-4.77** | **6.27** |
 
 The five-account configuration can exceed the ceiling and therefore cannot
-remain the steady state. CIS stays enabled in all five accounts only until the
-time-dependent C3 evidence is valid. After that capture, Terraform will:
+remain the steady state. CIS stayed enabled in all five accounts until the
+C3 control experiment was captured on 2026-07-30, which it now is. Terraform
+will next:
 
 1. retain CIS v3.0.0 in `awlz-security`;
 2. remove the explicit standard subscription from management, log archive,
@@ -65,7 +66,7 @@ score or a repeatable live lab with/without-SCP comparison. The timestamped C3
 artifact remains, while preventive SCPs, Config recording/rules, GuardDuty,
 Access Analyzer and centralized findings remain live. This is the cheapest
 configuration that preserves an ongoing named CIS benchmark in the delegated
-security account and keeps a conservative USD 7.27 buffer for usage variance.
+security account and keeps a conservative USD 6.27 buffer for usage variance.
 
 ## Fixed AwLZ cost
 

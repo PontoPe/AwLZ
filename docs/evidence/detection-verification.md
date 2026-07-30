@@ -119,8 +119,8 @@ The README has been corrected to describe this rather than the original promise.
 
 ## Cost note
 
-The measured-input conservative joint projection is USD 23.77/month with CIS
-in all five accounts and USD 12.73 with CIS retained only in the delegated
+The measured-input conservative joint projection is USD 24.77/month with CIS
+in all five accounts and USD 13.73 with CIS retained only in the delegated
 security account. All five subscriptions stay live until this experiment is
 valid; the cheaper configuration is applied immediately afterwards. See
 `docs/cost.md` for the arithmetic, measurement timestamps and evidence loss.

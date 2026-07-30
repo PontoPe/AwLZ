@@ -1,6 +1,6 @@
 # Autonomous completion progress
 
-Last updated: **2026-07-30T14:43:26-03:00**
+Last updated: **2026-07-30T15:31:39-03:00**
 
 This is the resumable execution ledger for C1–C7. It contains no concrete
 account IDs, ARNs, organization IDs, email addresses, or credentials.
@@ -8,7 +8,7 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
 ## Current state
 
 - Branch: `codex/awlz-autonomous-owner`
-- Active item: **C2/C3 — Security Hub stabilization and cost decision**
+- Active item: **C2 cost apply, then C4 and C5 remote work**
 - AWS session: management account administrator through IAM Identity Center;
   home region `sa-east-1`; validated without recording identifiers.
 - Repository gates: `fmt`, `tflint`, `trivy`, Checkov and `validate` for all six
@@ -76,6 +76,47 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
   remained at 21; all other accounts were at 35 or 36. The experiment remains
   blocked only on management-account control evaluation and no SCP attachment
   has changed.
+- At `2026-07-30T14:57:45-03:00` the baseline became admissible: every account
+  reports denominator 35 or 36, management included. `scripts/export-cis-score.sh`
+  now produces this table on demand and writes `docs/evidence/cis-score.txt`.
+  The Makefile had referenced that script since before it existed.
+
+### C3 — control experiment executed and reversed
+
+- Ran `2026-07-30T15:11:01-03:00` to `15:26:46-03:00`; `awlz-lab` was without
+  its SCPs for `15:18:14` to `15:23:34`, 5m20s.
+- The three SCPs sit on the Workloads OU, which also holds `awlz-dev`. They were
+  attached directly to `awlz-dev` before leaving the OU and removed from it only
+  after returning, so `awlz-dev`'s effective policy never changed. Only
+  `awlz-lab` was ever unprotected. Reattachment ran from a shell trap.
+- Probes flipped with the policy and back: `ec2:DescribeVpcs` in `eu-west-1` and
+  `cloudtrail:StopLogging` on a nonexistent trail were denied by SCP, then
+  allowed (the second returning `TrailNotFound`), then denied again. Neither
+  probe creates or destroys anything.
+- CIS v3.0.0 for `awlz-lab` was 24 passed / 11 failed / 0 unknown out of 35 in
+  both states, identical control by control. Three Config rules recorded a
+  successful evaluation inside each phase, so the second reading is fresh rather
+  than a stale copy.
+- Conclusion: no CIS v3.0.0 control reads an SCP, so the benchmark score cannot
+  measure a preventive guardrail. The behavioural probes are the evidence that
+  the guardrail works; the score is evidence about resource configuration.
+- Restoration verified by independent read of all three targets and by
+  `terraform plan` on `live/guardrails`: 0 to change, 0 to destroy, with only
+  the staged `require-permissions-boundary` policy and its two attachments
+  pending. Full write-up in `docs/evidence/scp-verification.md`.
+
+### CI gate — break-glass topic encryption
+
+- The first PR run failed on Trivy `AVD-AWS-0136`: the T8 SNS topic used
+  `alias/aws/sns`. An AWS-managed key carries no key policy, so nothing bounds
+  which principal decrypts an alert that announces recovery-role use.
+- Replaced with a dedicated rotating CMK whose policy grants CloudWatch
+  `GenerateDataKey*`/`Decrypt` only for this account and this alarm ARN. Cost
+  rises ~USD 1/month; the conservative joint steady state is now USD 13.73
+  against the USD 20 ceiling.
+- `fmt`, `tflint`, Trivy, Checkov (477 passed, 0 failed, 69 skipped) and all six
+  `validate` stacks pass locally; the pushed commit is green on every required
+  check.
 
 ### C2 — cost decision
 
@@ -84,13 +125,13 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
 - Measured inputs: 33 Config items on the latest estimated day, GuardDuty
   accrued usage USD 0.002667, and 46 active CIS findings across 35 evaluated
   controls in the mature security account.
-- The conservative joint projection is USD 23.77/month with CIS in all five
+- The conservative joint projection is USD 24.77/month with CIS in all five
   accounts, including PontoAntiCrack's documented USD 2.35 at-rest footprint.
   This can exceed the USD 20 ceiling.
 - Decision: preserve all five standards until C3 is valid, then retain CIS only
   in `awlz-security`, remove four explicit subscriptions and set future
-  auto-enable to `NONE`. Conservative joint result: USD 12.73/month, leaving
-  USD 7.27 buffer. The lost live per-account evidence is explicit in
+  auto-enable to `NONE`. Conservative joint result: USD 13.73/month, leaving
+  USD 6.27 buffer. The lost live per-account evidence is explicit in
   `docs/cost.md`.
 - C6 is time-bound rather than fabricated. Earliest closed-window retry:
   `2026-08-02T12:00:00-03:00` for the July 28–August 1 window, and only if
@@ -159,8 +200,8 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
 | Item | State | Proof required |
 |---|---|---|
 | C1 — GuardDuty | **Proved** | Four delegated members with `RelationshipStatus: Enabled` |
-| C2 — Security Hub cost decision | **Decided; apply after C3** | USD 23.77 five-account vs USD 12.73 security-only joint projection |
-| C3 — CIS control experiment | Pending | Stable baseline; lab with/without SCP measurements; independently verified reattachment |
+| C2 — Security Hub cost decision | **Decided; apply next** | USD 24.77 five-account vs USD 13.73 security-only joint projection |
+| C3 — CIS control experiment | **Proved** | Lab measured with and without SCPs, probes flipped both ways, reattachment verified independently and by plan |
 | C4 — T5 and T8 | Pending | Applied boundary adoption, Config detection, observed CloudTrail event and alarm |
 | C5 — CI least privilege | Pending | Member read-only roles and successful OIDC plans without write permissions |
 | C6 — cost actuals | **Time-bound** | Earliest retry 2026-08-02T12:00:00-03:00; require `Estimated: false` |
