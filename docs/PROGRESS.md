@@ -1,6 +1,6 @@
 # Autonomous completion progress
 
-Last updated: **2026-07-30T14:33:00-03:00**
+Last updated: **2026-07-30T14:43:26-03:00**
 
 This is the resumable execution ledger for C1–C7. It contains no concrete
 account IDs, ARNs, organization IDs, email addresses, or credentials.
@@ -12,8 +12,8 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
 - AWS session: management account administrator through IAM Identity Center;
   home region `sa-east-1`; validated without recording identifiers.
 - Repository gates: `fmt`, `tflint`, `trivy`, Checkov and `validate` for all six
-  live stacks passed on 2026-07-30. After the C1 resource was added, Checkov
-  reported 368 passed, 0 failed and 22 justified skips.
+  live stacks passed on 2026-07-30. With the staged C4, C5 and C7 work,
+  Checkov reported 465 passed, 0 failed and 66 justified skips.
 - Lab state: the PontoAntiCrack owner reported the lab released with no live
   operation. No lab-targeted plan, apply or SCP experiment was started here.
 
@@ -72,6 +72,10 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
   reached 36. Dev remained at 18 and management at 21, so the baseline is
   still inadmissible. PontoAntiCrack was independently idle and reported the
   lab released with no AWS or Stratus process.
+- At `2026-07-30T14:43:26-03:00`, dev reached denominator 35. Management
+  remained at 21; all other accounts were at 35 or 36. The experiment remains
+  blocked only on management-account control evaluation and no SCP attachment
+  has changed.
 
 ### C2 — cost decision
 
