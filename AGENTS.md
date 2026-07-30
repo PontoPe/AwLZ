@@ -19,7 +19,7 @@ Done:
 - Management account root MFA **done** — two devices, deliberately **not** in the same vault as the root password.
 - Billing: IAM access to billing activated, monthly cost budget USD 20 with alerts at 85%/100% actual and 100% forecasted, to `pedro.gradowski+aws-budgeting@gmail.com`.
 - AWS Organizations created, **all features**, Service control policies **enabled**. Org root id `r-ptjo`.
-- IAM Identity Center enabled in **sa-east-1**. Portal `https://pegradowski.awsapps.com/start`, user `pegradowski-iam_ic`, permission set `AdministratorAccess` with a 1-hour session, assigned to `pegradowski-mgmt`.
+- IAM Identity Center enabled in **sa-east-1**. Portal `https://pegradowski.awsapps.com/start`, user `pegradowski-iam_ic`, permission set `AdministratorAccess` with a 12-hour session, assigned to `pegradowski-mgmt`.
 - Local CLI profile **`mgmt`** configured via `aws configure sso` — SSO session `pegradowski`, region `sa-east-1`, no static credentials on disk.
 - **`live/bootstrap` applied, 2026-07-28.** 9 resources. State bucket `awlz-tfstate-<mgmt-account-id>` with a CMK (alias `alias/awlz-tfstate`), rotation on. State at `bootstrap/terraform.tfstate`; local state files deleted. Verified controls listed in `live/bootstrap/README.md`.
 - **`live/org-root` applied, 2026-07-28.** 1 imported, 7 added, 1 changed. OUs Security and Workloads; accounts `awlz-log-archive` + `awlz-security` under Security, `awlz-dev` + `awlz-lab` under Workloads, all ACTIVE. Trusted access enabled for 8 principals. **Centralized root access is on** — member accounts have no root credentials.
@@ -35,7 +35,7 @@ aws sso login --profile mgmt
 aws sts get-caller-identity --profile mgmt
 ```
 
-ARN must contain `AWSReservedSSO_AdministratorAccess`. Sessions expire in 1 hour; re-login is routine, not a bug. Then in any applied stack: `terraform init -backend-config=backend.hcl`.
+ARN must contain `AWSReservedSSO_AdministratorAccess`. Sessions expire in 12 hours; explicitly log out when the work is finished rather than leaving an administrator session cached. Then in any applied stack: `terraform init -backend-config=backend.hcl`.
 
 **Concrete IDs are not in this file on purpose** — account IDs, the org ID, the state bucket name and the KMS key ID live in gitignored `terraform.tfvars` / `backend.hcl`, and the repo goes public. To get them:
 
@@ -82,7 +82,7 @@ History was scrubbed of concrete IDs before the repo went public, and force-push
 | Management account hosts no workloads | Governance only. |
 | Alternate contact (Security) set to `+aws-security@` | AWS abuse and compromise notices route there. |
 | Identity Center home region `sa-east-1` | Cannot be changed without deleting the instance. Locked in. |
-| `AdministratorAccess` permission set capped at a 1-hour session | Default is 12 hours. A security portfolio should not ship a 12-hour admin session. |
+| `AdministratorAccess` permission set uses a 12-hour session | Changed from 1 hour to avoid repeated expiry during long plan/apply and evidence sessions. The longer administrator exposure is accepted deliberately: log out when finished, keep the workstation locked, and never replace SSO with a static credential. |
 
 | Centralized root access on, via Terraform | `aws_iam_organizations_features` with `RootCredentialsManagement` + `RootSessions`. Member accounts have no root credentials. Break-glass is `OrganizationAccountAccessRole` assumed from the management account. Threat model T9. |
 | Organization adopted by `import` block, managed not read | Makes trusted access declarative — a new service is one line in `var.service_access_principals`. Consequence: `aws_organizations_organization` is global and singular, so only `live/org-root` may manage it. |
