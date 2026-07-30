@@ -22,4 +22,7 @@ config_retention_days = 90
 # benchmark used by docs/evidence/ are explicit Terraform resources.
 # DEFAULT enables AWS's FSBP and CIS v1.2.0 defaults; NONE avoids those extra
 # checks.
-auto_enable_standards = "DEFAULT"
+auto_enable_standards = "NONE"
+
+# The C3 experiment is captured; the four member subscriptions are off for cost.
+member_standards_enabled = false

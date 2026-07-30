@@ -72,6 +72,17 @@ variable "auto_enable_standards" {
   default     = "DEFAULT"
 }
 
+# The cost lever, not a feature flag. Five CIS subscriptions project USD 24.77
+# jointly with PontoAntiCrack against a USD 20 ceiling; one projects USD 13.73.
+# The C3 control experiment needed all five and has been captured, so the four
+# member subscriptions come off. Membership, findings aggregation, Config,
+# GuardDuty and the SCPs are unaffected — see docs/cost.md.
+variable "member_standards_enabled" {
+  description = "Subscribe the four member accounts to CIS v3.0.0 in addition to the delegated administrator. Costs roughly USD 11/month."
+  type        = bool
+  default     = false
+}
+
 locals {
   tags = {
     Project   = var.project

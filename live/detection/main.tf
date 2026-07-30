@@ -98,7 +98,7 @@ resource "aws_securityhub_member" "existing" {
 }
 
 resource "aws_securityhub_standards_subscription" "management" {
-  for_each = module.detection.security_hub_standards
+  for_each = var.member_standards_enabled ? module.detection.security_hub_standards : {}
 
   standards_arn = each.value
 
@@ -108,7 +108,7 @@ resource "aws_securityhub_standards_subscription" "management" {
 resource "aws_securityhub_standards_subscription" "log_archive" {
   provider = aws.log_archive
 
-  for_each = module.detection.security_hub_standards
+  for_each = var.member_standards_enabled ? module.detection.security_hub_standards : {}
 
   standards_arn = each.value
 
@@ -118,7 +118,7 @@ resource "aws_securityhub_standards_subscription" "log_archive" {
 resource "aws_securityhub_standards_subscription" "dev" {
   provider = aws.dev
 
-  for_each = module.detection.security_hub_standards
+  for_each = var.member_standards_enabled ? module.detection.security_hub_standards : {}
 
   standards_arn = each.value
 
@@ -128,7 +128,7 @@ resource "aws_securityhub_standards_subscription" "dev" {
 resource "aws_securityhub_standards_subscription" "lab" {
   provider = aws.lab
 
-  for_each = module.detection.security_hub_standards
+  for_each = var.member_standards_enabled ? module.detection.security_hub_standards : {}
 
   standards_arn = each.value
 
