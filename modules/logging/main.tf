@@ -465,7 +465,20 @@ data "aws_iam_policy_document" "break_glass_topic" {
       identifiers = ["arn:aws:iam::${data.aws_caller_identity.mgmt.account_id}:root"]
     }
 
-    actions   = ["sns:*"]
+    # SNS rejects `sns:*` in a topic policy — only the topic-scoped actions are
+    # in service scope, and the API fails the whole SetTopicAttributes call
+    # rather than ignoring the rest.
+    actions = [
+      "sns:AddPermission",
+      "sns:DeleteTopic",
+      "sns:GetTopicAttributes",
+      "sns:ListSubscriptionsByTopic",
+      "sns:Publish",
+      "sns:RemovePermission",
+      "sns:SetTopicAttributes",
+      "sns:Subscribe",
+    ]
+
     resources = [aws_sns_topic.break_glass.arn]
   }
 
