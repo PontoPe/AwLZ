@@ -145,6 +145,12 @@ Each cost an apply. All are documented where they bite; collected here because t
 - **The GitHub OIDC `sub` is not `repo:owner/name`.** This repo gets immutable subject claims: `repo:PontoPe@96898980/AwLZ@1315312585`. Read yours with `gh api repos/<owner>/<name>/actions/oidc/customization/sub`. Nothing in the STS error hints at it, and the tempting fix — `StringLike` — would match a fork's pull request.
 - **S3 server access logging cannot cross accounts.** The original plan for T6b was impossible; CloudTrail data events replaced it and are better.
 - **`checkov-action` runs a 2021 Docker image** regardless of which release you pin. It produced three false positives on a bucket that was fine. CI installs checkov from pip at the same version used locally.
+- **SNS rejects `sns:*` in a topic policy.** `SetTopicAttributes` fails the whole call with "Policy statement action out of service scope", so the topic is created and left with no policy at all while the alarm never gets attached. The owner statement has to name the topic-scoped actions.
+- **`alias/aws/sns` cannot carry a key policy.** Which is why the break-glass topic has its own CMK: nothing else bounds who decrypts an alert announcing recovery-role use, and the grant cannot be revoked independently of SNS.
+- **`iam list-roles` does not return `PermissionsBoundary`.** Adoption has to be read with `get-role`, one role at a time. A boundary that silently failed to attach looks identical to one that worked if you check with `list-roles`.
+- **`StartConfigRulesEvaluation` is rate limited to roughly one rule at a time.** Firing a batch returns `LimitExceededException` after the first success or two. Pace it and retry, or accept a subset and say which.
+- **Git Bash rewrites arguments that look like paths.** `--log-group-name /aws/lambda/x` reaches `aws.exe` as `C:/...` and comes back as a regex validation error that says nothing about path conversion. `MSYS_NO_PATHCONV=1` fixes it; the same class of bug makes `file://` parameters fail on Windows CLI builds.
+- **A quota is per account, not per organization.** The Lambda concurrency increase had to be requested inside `awlz-lab`, not in management — the management value was irrelevant to a function deployed in the member account.
 
 ## Where to read next
 
