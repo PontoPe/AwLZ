@@ -7,7 +7,7 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
 
 ## Current state
 
-- Branch: `codex/awlz-autonomous-owner`
+- Branch: `main` (the autonomous-owner work merged through PR #11)
 - Active item: **C6 only — waiting on a closed Cost Explorer window**
 - AWS session: management account administrator through IAM Identity Center;
   home region `sa-east-1`; validated without recording identifiers.
@@ -169,7 +169,9 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
 - The Config rule found real drift on its first evaluation in `awlz-lab`: the
   two AwLZ roles are `COMPLIANT`, and three PontoAntiCrack remediation roles
   that predate the boundary are `NON_COMPLIANT`. They belong to the sibling
-  owner and were left untouched.
+  owner and were left untouched. The finding is recorded in that project's
+  handoff; adopting the boundary or declaring an exception is its decision, and
+  the preventive SCP already governs anything created from now on.
 
 ### C4 — T8 applied and observed firing 2026-07-30
 
@@ -209,7 +211,9 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
   `config:PutConfigurationRecorder`.
 - Terraform validation, tflint, Trivy and Checkov pass; Checkov reports 465
   passed, 0 failed and 66 justified skips.
-- Remote plan/apply and real OIDC plan proof remain pending.
+- The real OIDC plan proof is complete: CI run `30571919250` planned all six
+  stacks green through the member read-only roles. Remote applies remain
+  intentionally gated on the production environment.
 
 ### C7 — deterministic recording path staged
 
