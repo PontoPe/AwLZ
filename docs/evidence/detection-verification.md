@@ -177,3 +177,49 @@ matrix, and [run 30571919250](https://github.com/PontoPe/AwLZ/actions/runs/30571
 planned all six stacks green through OIDC with that role. Before C5 those three
 stacks could only be planned by assuming administrator, which is why they were
 excluded rather than quietly planned.
+
+## Verification pass — 2026-08-15
+
+Sixteen days after the controls were applied, re-read rather than assumed.
+
+### Config recorders, all five
+
+| Account | `recording` | `lastStatus` | Last status change |
+|---|---|---|---|
+| `awlz-security` | `true` | `SUCCESS` | 2026-08-15T18:42:48-03:00 |
+| `awlz-log-archive` | `true` | `SUCCESS` | 2026-08-15T18:32:10-03:00 |
+| `awlz-dev` | `true` | `SUCCESS` | 2026-08-15T19:16:46-03:00 |
+| `awlz-lab` | `true` | `SUCCESS` | 2026-08-15T19:42:46-03:00 |
+| management | `true` | `SUCCESS` | 2026-08-15T18:42:50-03:00 |
+
+This check was prompted by a cost figure, not by an alarm. AWS Config billed
+USD 0.997 in July and USD 0.003 in August, a 300-fold drop that reads exactly
+like a recorder that stopped. It is the opposite: July contained the initial
+capture of every existing resource, and August is a steady state in which
+almost nothing changes. Config bills per configuration item *recorded*, so a
+quiet organization is a cheap one.
+
+`docs/cost.md` already warns that a healthy recorder can read as USD 0 under the
+wrong Cost Explorer grouping. This is the same confusion from the other
+direction, and the resolution is the same: ask the recorder, not the invoice.
+
+### A member account cannot archive its own findings
+
+The five GuardDuty sample findings generated on 2026-07-30 during the sibling
+project's fixture capture were still unarchived, two of them at severity 8.
+Archiving them from inside `awlz-lab` — as the account administrator, through
+the recovery role — fails:
+
+```text
+BadRequestException: The request is rejected because the caller is not
+authorized to call this API.
+```
+
+That is not a permissions mistake. In an organization with a delegated
+GuardDuty administrator, only the administrator may archive; a member cannot
+suppress findings about itself even holding administrator in its own account.
+The delegation configured in `live/detection` therefore buys something the
+delegation itself never claimed: **an attacker who takes a member account
+cannot quietly clear the evidence.**
+
+Archived from `awlz-security`. Unarchived findings in the organization: 0.
