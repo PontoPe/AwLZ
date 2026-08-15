@@ -83,6 +83,41 @@ PontoAntiCrack's documented at-rest deployment. What was released in July was
 the *concurrency quota request*, not the account. The two are easy to conflate
 and the sibling repo's wording should say which.
 
+### Confirmation — 2026-08-15, half of August observed
+
+The three-day run rate held. Gross usage for `2026-08-01`–`2026-08-15` is
+**USD 2.8364**, which annualises to roughly USD 5.86 before tax against the
+USD 6.38/month projected from three days.
+
+| Service | USD, 1–15 Aug |
+|---|---:|
+| AWS Key Management Service | 2.2581 |
+| Amazon S3 | 0.3041 |
+| AWS Secrets Manager | 0.1812 |
+| **AWS Cost Explorer** | **0.0900** |
+| AWS Config | 0.0030 |
+| AWS CloudTrail | 0.0000 |
+| **Total** | **2.8364** |
+
+Two things in that table are worth naming.
+
+**Cost Explorer bills for being asked.** USD 0.01 per request, and measuring C6
+cost USD 0.09 — the measurement is now a line item in the thing it measures. It
+is small and it is not free, and a monthly re-measurement is a recurring charge
+rather than a free query.
+
+**Config fell from USD 0.997 to USD 0.003.** A 300-fold drop that reads like a
+broken recorder. It is not: July contained the first-time recording of every
+existing resource, and August is a steady state where almost nothing changes.
+All five recorders were checked directly and report `recording: true` /
+`lastStatus: SUCCESS` — see `docs/evidence/detection-verification.md`. **The
+July Config figure is a baseline, not a run rate**, and any projection built on
+it would have been roughly 300x too high.
+
+The budget reports USD 3.093 actual against the USD 20 ceiling, 15%. No
+threshold has fired; alerts remain at 85% and 100% of actual plus 100% of
+forecast.
+
 ### Delta against the 2026-07-30 projection
 
 | Line | Projected | Actual (Aug run rate) | Delta |
