@@ -1,6 +1,6 @@
 # Autonomous completion progress
 
-Last updated: **2026-07-30T16:05:00-03:00**
+Last updated: **2026-08-15**
 
 This is the resumable execution ledger for C1–C7. It contains no concrete
 account IDs, ARNs, organization IDs, email addresses, or credentials.
@@ -134,9 +134,12 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
   auto-enable to `NONE`. Conservative joint result: USD 13.73/month, leaving
   USD 6.27 buffer. The lost live per-account evidence is explicit in
   `docs/cost.md`.
-- C6 is time-bound rather than fabricated. Earliest closed-window retry:
-  `2026-08-02T12:00:00-03:00` for the July 28–August 1 window, and only if
-  Cost Explorer returns `Estimated: false`.
+- C6 was time-bound rather than fabricated, and closed on 2026-08-04 once the
+  July window returned `Estimated: false`. The projection above was conservative
+  by roughly a factor of two: actual gross usage for July was USD 1.4830 and the
+  August run rate is USD 6.38/month. Both are recorded in `docs/cost.md` with
+  what distorts them — July was credit-covered, and both detection services are
+  inside trials until late August.
 
 ### C4 — T5 applied 2026-07-30
 
