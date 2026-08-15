@@ -3,13 +3,129 @@
 Monthly run cost of AwLZ plus the sibling PontoAntiCrack deployment. Home
 region is `sa-east-1`; the hard shared ceiling is **USD 20/month**.
 
-## Measurement status — 2026-07-30
+## Measured actual — 2026-08-04, July window closed
 
-Cost Explorer was queried for `2026-07-28` through `2026-07-30`, grouped by
-service with unblended cost and usage quantity. Both daily intervals still
-returned `Estimated: true`. The only nonzero money rows offset to net USD 0:
-S3 `+0.000119` and Data Transfer `-0.000119`. This is ingestion evidence, not a
-closed-window actual.
+C6 is closed. Cost Explorer returns `Estimated: false` for
+`2026-07-01`–`2026-08-01`, so the numbers below are billed actuals rather than
+a projection.
+
+### Read this first: grouping by service hides credits
+
+Grouping by `SERVICE` without a record-type filter sums the `Credit` record
+type into the same bucket as `Usage`. Every service in this organization
+returned `0` under that grouping in July, which looks like nothing was billed
+and is wrong — it means usage and credit netted out. Gross cost needs the
+filter:
+
+```bash
+aws ce get-cost-and-usage \
+  --time-period Start=2026-07-01,End=2026-08-01 \
+  --granularity MONTHLY --metrics UnblendedCost \
+  --filter '{"Dimensions":{"Key":"RECORD_TYPE","Values":["Usage"]}}' \
+  --group-by Type=DIMENSION,Key=SERVICE \
+  --profile mgmt --region us-east-1
+```
+
+Without `RECORD_TYPE`, a healthy Config recorder emitting 325 configuration
+items reads as USD 0 and gets mistaken for a broken recorder or a free tier.
+It is neither.
+
+### July 2026 — billed actual, gross usage
+
+| Service | USD | Note |
+|---|---:|---|
+| AWS Config | 0.9970 | 325 configuration items + 22 rule evaluations |
+| AWS Key Management Service | 0.3723 | prorated; keys created mid-month |
+| Amazon S3 | 0.0748 | |
+| AWS Secrets Manager | 0.0173 | PontoAntiCrack, prorated from 2026-07-30 |
+| AWS CloudTrail | 0.0015 | data events on the state bucket only |
+| Amazon GuardDuty | 0.0000 | inside the 30-day trial |
+| AWS Security Hub | 0.0000 | inside its trial |
+| **Gross usage** | **1.4629** | |
+| Other services (rounding, Data Transfer, Glue, DynamoDB, SNS, SQS) | 0.0201 | |
+| **Total usage** | **1.4830** | |
+| **Credits applied** | **−1.4830** | |
+| **Net invoiced** | **0.0000** | |
+
+Config bills per recorded configuration item and rule evaluation; the current
+São Paulo rate is [USD 0.003 per configuration item and USD 0.001 per rule
+evaluation](https://aws.amazon.com/config/pricing/). The observed figure
+reconciles exactly: `325 × 0.003 + 22 × 0.001 = 0.997`.
+
+**Do not report July as USD 0.** The operating cost was USD 1.48; a credit
+covered it. Reporting the net would understate the model by the entire amount
+it was supposed to measure.
+
+### August 2026 — first uncredited month
+
+Credits stop at the July boundary. `2026-08-01`–`2026-08-04` contains no
+`Credit` record type at all: `Usage 0.6322` and `Tax 0.03`. August is the first
+month whose invoice reflects what this organization actually costs.
+
+Run rate from three full days, by account:
+
+| Account | Service | USD/day | USD/month |
+|---|---|---:|---:|
+| `pegradowski-mgmt` | KMS — 2 keys | 0.0645 | 2.00 |
+| `awlz-log-archive` | KMS — 2 keys | 0.0645 | 2.00 |
+| `awlz-log-archive` | S3 | 0.0217 | 0.67 |
+| `awlz-lab` | KMS — 1 key (`alias/pac`) | 0.0323 | 1.00 |
+| `awlz-lab` | Secrets Manager (`pac/slack-webhook`) | 0.0129 | 0.40 |
+| `pegradowski-mgmt` | Tax | — | 0.31 |
+| | **Total** | | **6.38** |
+
+Split: **AwLZ USD 4.67** (4 keys, S3, tax) and **PontoAntiCrack USD 1.40**
+(1 key, 1 secret, three idle Lambdas).
+
+`awlz-lab` carries a recurring USD 1.40/month. This is expected, not a leak:
+`alias/pac`, `pac/slack-webhook` and the three `pac-*` Lambdas are
+PontoAntiCrack's documented at-rest deployment. What was released in July was
+the *concurrency quota request*, not the account. The two are easy to conflate
+and the sibling repo's wording should say which.
+
+### Delta against the 2026-07-30 projection
+
+| Line | Projected | Actual (Aug run rate) | Delta |
+|---|---:|---:|---|
+| AwLZ four CMKs | 4.05 | 4.00 | −0.05, matched |
+| CloudTrail + CloudWatch Logs | 1.10 | ~0.67 | −0.43, S3 only; log tail not yet billing |
+| Config items + rules | 3.12 | 0.00 so far | **−3.12, see below** |
+| GuardDuty | 0.25 | 0.00 | trial until ~2026-08-27 |
+| Security Hub CIS | 2.76 | 0.00 | trial; standard removed outside `awlz-security` |
+| Break-glass alarm | 0.10 | 0.00 | below billing granularity |
+| PontoAntiCrack at rest | 2.35 | 1.40 | −0.95 |
+| Secrets Manager | *absent* | 0.40 | **line missing from the model** |
+| **Joint** | **13.73** | **6.38** | |
+
+Two corrections to the model, and the first one matters more than the number:
+
+1. **Config cost is change-driven, not time-driven.** The projection
+   extrapolated 33 configuration items from a *deployment* day and multiplied
+   by 30. August so far has recorded **zero** configuration items, because
+   nothing in the organization changed — the boundary rules are
+   change-triggered, so no change means no evaluation either. Config bills what
+   the org does, not how long it exists. A month with a Terraform apply in it
+   will bill; a quiet month will not. Neither USD 3.12 nor USD 0 is the steady
+   state, and a single closed month cannot produce that figure.
+2. **Secrets Manager was missing from the model entirely** at USD 0.40/month
+   flat. Small, but it was invisible rather than estimated low.
+
+### What August still cannot tell us
+
+- **GuardDuty's trial ends around 2026-08-27**, so the August invoice covers at
+  most four billed days of it. The projected USD 0.25/month came from accrued
+  trial usage across four detectors, which is a fragile basis.
+- **Security Hub** is in the same position.
+- `get-cost-forecast` returns `DataUnavailableException — Insufficient amount
+  of historical data`. The organization is too young to forecast.
+
+**September 2026 is the first representative month.** Anything reported before
+then is a partial trial month, and should say so.
+
+## The 2026-07-30 projection, retained
+
+Kept verbatim beside the actual above. The delta *is* the evidence about the
+model, and deleting the superseded estimate would destroy it.
 
 | Input | Observed | How it is used |
 |---|---:|---|
@@ -27,7 +143,7 @@ invoice](https://docs.aws.amazon.com/guardduty/latest/ug/guardduty-pricing.html)
 Security Hub usage is likewise still inside its trial; the calculation uses
 the current CSPM price-list SKU rather than treating trial-zero as steady state.
 
-## Conservative joint projection
+### Conservative joint projection
 
 The Security Hub multiplier includes a 2× change/re-evaluation margin:
 
@@ -79,6 +195,17 @@ security account and keeps a conservative USD 6.27 buffer for usage variance.
 | KMS requests | — | ~0.05 | bucket keys collapse most requests |
 | **Fixed subtotal** | | **~4.05** | |
 
+**Confirmed against the August run rate: USD 4.00/month, 2 keys in
+`pegradowski-mgmt` and 2 in `awlz-log-archive`.** Key requests billed below
+Cost Explorer's granularity, so the `~0.05` line is an upper bound rather than
+a measurement. This is the only line of the model the first closed window
+confirmed outright.
+
+A fifth customer-managed key exists in the organization — `alias/pac` in
+`awlz-lab` — and it is PontoAntiCrack's, not AwLZ's. Anyone reading a
+consolidated KMS charge of USD 5.00/month against this table will conclude the
+table is wrong. It is not; the billing view is org-wide and this table is not.
+
 Four keys is deliberate. A fifth for the CloudWatch log group was rejected: the
 durable copy is already CMK-encrypted in S3. The Config bucket retains its own
 key because it contains an inventory of every account. The break-glass topic
@@ -98,21 +225,36 @@ offers neither a source-bound grant nor a revocation switch independent of SNS.
   early, including by root.
 - No workload run cost is included beyond PontoAntiCrack's documented at-rest
   footprint. A forgotten lab instance remains a separate risk.
+- **Credits are not a guardrail.** They covered 100% of July and stopped at the
+  month boundary with no warning in any dashboard this repo watches. The budget
+  alarms are set against spend, so a credit expiry is invisible to them until
+  the spend it was hiding shows up.
 
-## C6 — earliest valid actual
+## C6 — closed 2026-08-04
 
-The July billing window closes at `2026-08-01T00:00:00Z`. Allowing a full day
-for Cost Explorer ingestion, the earliest defensible retry is
-**2026-08-02T12:00:00-03:00**, querying:
+The July window closed at `2026-08-01T00:00:00Z` and Cost Explorer returned
+`Estimated: false` on 2026-08-04. The actual is recorded above.
+
+Re-run for any later month with:
 
 ```bash
 aws ce get-cost-and-usage \
-  --time-period Start=2026-07-28,End=2026-08-01 \
+  --time-period Start=2026-08-01,End=2026-09-01 \
   --granularity MONTHLY --metrics UnblendedCost UsageQuantity \
+  --filter '{"Dimensions":{"Key":"RECORD_TYPE","Values":["Usage"]}}' \
   --group-by Type=DIMENSION,Key=SERVICE \
   --profile mgmt --region us-east-1
 ```
 
 Do not relabel a result as actual if Cost Explorer still returns
-`Estimated: true`. Keep this projection beside the first closed-window actual;
-the delta is evidence about the model.
+`Estimated: true`. The 2026-07-30 projection stays in this file beside the
+closed-window actual; the delta is evidence about the model.
+
+Three rules this exercise produced, each from getting it wrong first:
+
+1. **Filter `RECORD_TYPE=Usage`.** Otherwise credits net against usage inside
+   the same service row and healthy infrastructure reads as free.
+2. **Report gross, then credit, then net — all three.** A net of USD 0 is true
+   and useless.
+3. **A single closed month is not a steady state** when a service is inside a
+   trial or when its billing is change-driven. Say which lines are which.

@@ -1,6 +1,6 @@
 # Handoff — AwLZ
 
-State of the project as of **2026-07-30**. Written for a person picking this up cold, including the person who built it.
+State of the project as of **2026-08-15**; cost measured 2026-08-04. Written for a person picking this up cold, including the person who built it.
 
 `AGENTS.md` is the agent-facing version: rules, conventions, gotchas. This one is the situation report.
 
@@ -56,14 +56,19 @@ Gate baseline: **checkov 477 passed / 0 failed / 69 skipped**, trivy and tflint 
 
 ## What is not done
 
-One thing, and it is a calendar, not code.
+**Nothing is open on a deadline.** C1–C7 are complete: cost actuals closed on
+2026-08-04 against the first billable window.
 
-**Cost actuals — waiting on a closed billing window.** Cost Explorer still
-returns `Estimated: true` for every day this organization has existed. The
-earliest defensible retry is **2026-08-02T12:00:00-03:00** for the 28 July–1
-August window, and only if the API stops saying estimated. `docs/cost.md` shows
-the arithmetic and labels the projection a projection.
+One measurement is still ahead rather than overdue. GuardDuty and Security Hub
+are inside their trials until late August, and July was fully covered by
+credits, so **September 2026 is the first month whose invoice represents what
+this organization actually costs.** Both distortions are named in `docs/cost.md`
+beside the numbers they affect.
 
+The maintenance list — what goes stale, where, and what refreshes it — is in
+[TrustStack/docs/ROADMAP.md](../../TrustStack/docs/ROADMAP.md).
+
+Everything that was open on 2026-07-28 is closed:
 Everything else that was open on 2026-07-28 is closed:
 
 **CIS score — done, and the result is negative.** `awlz-lab` was measured with
@@ -169,10 +174,11 @@ Each stack also has its own README covering what it creates and what went wrong 
 Items 1–4 and 6 of the previous list are done and merged in
 [PR #11](https://github.com/PontoPe/AwLZ/pull/11). What remains:
 
-1. **Cost actuals.** On or after `2026-08-02T12:00:00-03:00`, query Cost
-   Explorer for 28 July–1 August. If it still returns `Estimated: true`, do not
-   relabel it — record the refusal and pick the next date. The query is in
-   `docs/cost.md`.
+1. **Re-measure cost after 2026-09-01.** July was credit-covered and both
+   detection services were inside their trials, so August is the first
+   uncredited month and September the first fully representative one. Use the
+   query in `docs/cost.md` **with its `RECORD_TYPE` filter** — without it,
+   credits net usage to zero and a healthy Config recorder reads as USD 0.
 2. **Hand the boundary finding to PontoAntiCrack.** The T5 Config rule reports
    `pac-sg-open-remediation`, `pac-s3-public-remediation` and
    `pac-iam-key-leak-remediation` in `awlz-lab` as `NON_COMPLIANT`; they predate

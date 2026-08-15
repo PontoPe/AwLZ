@@ -1,6 +1,6 @@
 # Autonomous completion progress
 
-Last updated: **2026-07-30T16:05:00-03:00**
+Last updated: **2026-08-15**
 
 This is the resumable execution ledger for C1–C7. It contains no concrete
 account IDs, ARNs, organization IDs, email addresses, or credentials.
@@ -8,7 +8,7 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
 ## Current state
 
 - Branch: `main` (the autonomous-owner work merged through PR #11)
-- Active item: **C6 only — waiting on a closed Cost Explorer window**
+- Active item: **none.** C1–C7 complete; C6 closed 2026-08-04 against the first billable window
 - AWS session: management account administrator through IAM Identity Center;
   home region `sa-east-1`; validated without recording identifiers.
 - Repository gates: `fmt`, `tflint`, `trivy`, Checkov and `validate` for all six
@@ -134,9 +134,12 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
   auto-enable to `NONE`. Conservative joint result: USD 13.73/month, leaving
   USD 6.27 buffer. The lost live per-account evidence is explicit in
   `docs/cost.md`.
-- C6 is time-bound rather than fabricated. Earliest closed-window retry:
-  `2026-08-02T12:00:00-03:00` for the July 28–August 1 window, and only if
-  Cost Explorer returns `Estimated: false`.
+- C6 was time-bound rather than fabricated, and closed on 2026-08-04 once the
+  July window returned `Estimated: false`. The projection above was conservative
+  by roughly a factor of two: actual gross usage for July was USD 1.4830 and the
+  August run rate is USD 6.38/month. Both are recorded in `docs/cost.md` with
+  what distorts them — July was credit-covered, and both detection services are
+  inside trials until late August.
 
 ### C4 — T5 applied 2026-07-30
 
@@ -244,7 +247,7 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
 | C3 — CIS control experiment | **Proved** | Lab measured with and without SCPs, probes flipped both ways, reattachment verified independently and by plan |
 | C4 — T5 and T8 | **Proved** | Boundary adopted in four accounts, Config rules `ACTIVE`, alarm moved to `ALARM` on real recovery-role assumptions |
 | C5 — CI least privilege | **Proved** | Member read-only roles applied; all six stacks planned green in CI through OIDC with no administrator |
-| C6 — cost actuals | **Time-bound** | Earliest retry 2026-08-02T12:00:00-03:00; require `Estimated: false` |
+| C6 — cost actuals | **Proved** | July window `Estimated: false`: gross usage USD 1.4830, credits covered it, August run rate USD 6.38/month |
 | C7 — demo | **Proved** | `docs/img/awlz-ci-readonly.cast` and `.gif`, audited as text and inspected as pixels |
 
 ## Recovery invariants

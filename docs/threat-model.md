@@ -4,6 +4,8 @@
 
 The AWS Organization and its guardrails: management account, security/log-archive account, workload accounts, the Terraform that manages them, and the CI identity that applies it. Application workloads inside member accounts are **out of scope**.
 
+**Program-level threats live in [TrustStack/docs/threat-model.md](../../TrustStack/docs/threat-model.md).** Two things below are understated when read alone: T1 conditions the CI role on an exact `sub`, which is correct, but the same GitHub account is also the Sigstore signing identity a cluster enforces — one compromise, two capabilities (X6 there). And the SCP protecting `pac-*` resources is a control PontoAntiCrack depends on while having no test that its own resources match the prefix (X5).
+
 ## Assets
 
 | Asset | Why it matters |
