@@ -247,7 +247,7 @@ account IDs, ARNs, organization IDs, email addresses, or credentials.
 | C3 — CIS control experiment | **Proved** | Lab measured with and without SCPs, probes flipped both ways, reattachment verified independently and by plan |
 | C4 — T5 and T8 | **Proved** | Boundary adopted in four accounts, Config rules `ACTIVE`, alarm moved to `ALARM` on real recovery-role assumptions |
 | C5 — CI least privilege | **Proved** | Member read-only roles applied; all six stacks planned green in CI through OIDC with no administrator |
-| C6 — cost actuals | **Proved** | July window `Estimated: false`: gross usage USD 1.4830, credits covered it, August run rate USD 6.38/month |
+| C6 — cost actuals | **Proved** | July window `Estimated: false`: gross usage USD 1.4830, credits covered it, August run rate USD 6.38/month. September (first steady-state month) USD 7.03 gross, USD 7.31 invoiced, measured 2026-10-08 |
 | C7 — demo | **Proved** | `docs/img/awlz-ci-readonly.cast` and `.gif`, audited as text and inspected as pixels |
 
 ## Recovery invariants

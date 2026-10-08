@@ -59,11 +59,12 @@ Gate baseline: **checkov 477 passed / 0 failed / 69 skipped**, trivy and tflint 
 **Nothing is open on a deadline.** C1–C7 are complete: cost actuals closed on
 2026-08-04 against the first billable window.
 
-One measurement is still ahead rather than overdue. GuardDuty and Security Hub
-are inside their trials until late August, and July was fully covered by
-credits, so **September 2026 is the first month whose invoice represents what
-this organization actually costs.** Both distortions are named in `docs/cost.md`
-beside the numbers they affect.
+The representative month has now been measured. July was fully covered by
+credits and the GuardDuty and Security Hub trials ended inside August, so
+**September 2026 was the first month whose invoice represents what this
+organization actually costs: USD 7.03 gross usage, USD 7.31 invoiced**, measured
+2026-10-08. Every earlier figure is kept in `docs/cost.md` beside what distorts
+it.
 
 The maintenance list — what goes stale, where, and what refreshes it — is in
 [TrustStack/docs/ROADMAP.md](../../TrustStack/docs/ROADMAP.md).
@@ -174,11 +175,10 @@ Each stack also has its own README covering what it creates and what went wrong 
 Items 1–4 and 6 of the previous list are done and merged in
 [PR #11](https://github.com/PontoPe/AwLZ/pull/11). What remains:
 
-1. **Re-measure cost after 2026-09-01.** July was credit-covered and both
-   detection services were inside their trials, so August is the first
-   uncredited month and September the first fully representative one. Use the
-   query in `docs/cost.md` **with its `RECORD_TYPE` filter** — without it,
-   credits net usage to zero and a healthy Config recorder reads as USD 0.
+1. ~~**Re-measure cost after 2026-09-01.**~~ Done 2026-10-08: September
+   USD 7.31 invoiced, recorded in `docs/cost.md`. To re-measure a later month,
+   use the query there **with its `RECORD_TYPE` filter** — without it, credits
+   net usage to zero and a healthy Config recorder reads as USD 0.
 2. **Hand the boundary finding to PontoAntiCrack.** The T5 Config rule reports
    `pac-sg-open-remediation`, `pac-s3-public-remediation` and
    `pac-iam-key-leak-remediation` in `awlz-lab` as `NON_COMPLIANT`; they predate
