@@ -157,6 +157,81 @@ Two corrections to the model, and the first one matters more than the number:
 **September 2026 is the first representative month.** Anything reported before
 then is a partial trial month, and should say so.
 
+### August 2026 — closed window
+
+Measured 2026-10-08, `Estimated: false`. Gross usage **USD 6.3126**, tax USD
+0.29, no credit records: **USD 6.60 invoiced**. The three-day run rate of USD
+6.38 held to within four cents of usage.
+
+It contains the trial cliff, and the usage types show where it fell: Security
+Hub billed 116 paid compliance checks (USD 0.116) after 783 free ones, and
+GuardDuty 1,270 paid events (USD 0.0089) after 11,996 free. About four billed
+days of each — consistent with trials ending around 2026-08-27. August is
+still not a steady state; it is the month the steady state started in.
+
+AWS Cost Explorer billed USD 0.12 in August: the C6 measurement and its
+re-checks, at USD 0.01 per request.
+
+### September 2026 — first representative month
+
+Measured 2026-10-08, `Estimated: false`. No credits and no trials anywhere in
+the window. This is the first number that can be quoted as steady state.
+
+| Service | USD | Basis |
+|---|---:|---|
+| AWS Key Management Service | 4.9944 | 5 keys: 2 `pegradowski-mgmt`, 2 `awlz-log-archive`, 1 `awlz-lab` (`alias/pac`) |
+| **AWS Security Hub** | **0.8700** | 870 paid compliance checks, `awlz-security` only |
+| Amazon S3 | 0.6517 | 0.645 of it in `awlz-log-archive` |
+| AWS Secrets Manager | 0.4011 | `pac/slack-webhook` in `awlz-lab` |
+| **Amazon GuardDuty** | **0.0783** | 11,186 paid events analyzed, five detectors |
+| AWS Config | 0.0390 | 13 configuration items recorded |
+| AWS CloudTrail | 0.0001 | |
+| Amazon CloudWatch | 0.0000 | 10 alarms monitored, inside the free tier |
+| DynamoDB, Glue, SNS, SQS | 0.0000 | |
+| **Gross usage** | **7.0346** | |
+| Tax | 0.28 | |
+| Credits | 0.00 | no `Credit` record type in the window |
+| **Invoiced** | **7.31** | |
+
+Split: **AwLZ USD 5.63** (four keys, the log archive, Security Hub, GuardDuty,
+Config) and **PontoAntiCrack USD 1.40** (`alias/pac` and the webhook secret —
+unchanged from August, as an idle deployment should be).
+
+No Cost Explorer line: nobody queried it in September. The queries that
+produced this section will bill in October.
+
+### Delta against the 2026-07-30 projection, September actual
+
+| Line | Projected | Sept actual | Delta |
+|---|---:|---:|---|
+| AwLZ four CMKs | 4.05 | 4.00 | matched |
+| CloudTrail + CloudWatch Logs | 1.10 | 0.65 | −0.45; archive S3 only, log tail still not billing |
+| Config items + rules | 3.12 | 0.04 | −3.08; quiet month, 13 items |
+| GuardDuty | 0.25 | 0.08 | −0.17 |
+| Security Hub CIS | 2.76 | 0.87 | −1.89, see below |
+| Break-glass alarm | 0.10 | 0.00 | free tier |
+| PontoAntiCrack at rest (incl. Secrets Manager) | 2.35 | 1.40 | −0.95 |
+| **Joint, gross usage** | **13.73** | **7.03** | **−6.70** |
+
+**Security Hub was the largest uncertain line, and it came in at a third of
+the projection.** The model assumed 46 checks × 30 days × a 2× re-evaluation
+margin = 2,760 checks. The real figure is 870 — about 29 a day. The margin
+was not needed in a month without changes, and the daily check count is lower
+than the 46 active findings the proxy was built on. A month with Terraform
+applies will evaluate more; 870 is a quiet-month floor, not a ceiling.
+
+**The trial cliff was USD 0.95/month**, not the USD 3.01 the projection
+reserved for GuardDuty and Security Hub together. The organization's measured
+steady state is **USD 7.31/month invoiced — 37% of the USD 20 ceiling.**
+
+### What is still open
+
+- `get-cost-forecast` no longer returns `DataUnavailableException`; on
+  2026-10-08 it returned `InternalFailure` on every retry. The budget's own
+  forecast works: USD 6.34 for October, USD 1.69 actual by 2026-10-08.
+- Config and Security Hub are change-driven, and September was quiet. A month
+  with real Terraform activity is the upper bound, and none has been measured.
+
 ## The 2026-07-30 projection, retained
 
 Kept verbatim beside the actual above. The delta *is* the evidence about the
